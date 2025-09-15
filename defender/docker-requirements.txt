@@ -7,3 +7,4 @@ pefile
 numpy
 tqdm
 pandas
+lightgbm
