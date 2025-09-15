@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Optimized Flask application for malware detection competition
+Flask application for malware detection competition
 Memory ≤ 1GB, Response time ≤ 5 seconds, FPR ≤ 1%, TPR ≥ 95%
 """
 
@@ -15,8 +15,60 @@ import envparse
 # Add current directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Import your optimized model
-from final_optimized_model import CompetitionNFSModel, OptimizedNFSModel
+# Import your available models (remove the problematic final_optimized_model import)
+try:
+    from models.final_optimized_model import CompetitionNFSModel, OptimizedNFSModel
+except ImportError:
+    # Fallback: Create compatible wrapper classes for your existing models
+    print("Warning: final_optimized_model not found, using fallback implementations")
+    
+    class CompetitionNFSModel:
+        def __init__(self, model_file_or_object):
+            if hasattr(model_file_or_object, 'read'):  # It's a file object
+                self.model = pickle.load(model_file_or_object)
+            else:
+                self.model = model_file_or_object
+        
+        def predict(self, bytez):
+            # Adapt to your model's predict method
+            if hasattr(self.model, 'predict'):
+                result = self.model.predict(bytez)
+                # Ensure result is 0 or 1
+                if isinstance(result, (list, tuple)):
+                    result = int(result[0] > 0.5) if len(result) > 0 else 1
+                elif isinstance(result, float):
+                    result = int(result > 0.5)
+                elif isinstance(result, bool):
+                    result = int(result)
+                return result
+            return 1  # Default to malware if no predict method
+        
+        def model_info(self):
+            return {
+                "model_type": "CompetitionNFS",
+                "status": "loaded"
+            }
+    
+    class OptimizedNFSModel:
+        def __init__(self):
+            # This is a fallback model - you can implement basic logic here
+            pass
+        
+        def predict(self, bytez):
+            # Simple heuristic fallback
+            # Check for common PE patterns
+            if bytez.startswith(b'MZ') and len(bytez) > 1000:
+                # Basic PE file detected, do simple checks
+                if b'CreateFile' in bytez or b'WriteFile' in bytez:
+                    return 1  # Potentially suspicious
+                return 0  # Likely benign
+            return 1  # Unknown format, assume malware
+        
+        def model_info(self):
+            return {
+                "model_type": "OptimizedNFS (Fallback)",
+                "status": "fallback_active"
+            }
 
 def create_app(model):
     app = Flask(__name__)
@@ -90,7 +142,10 @@ def create_app(model):
         """Get model information"""
         try:
             model = app.config['model']
-            info = model.model_info()
+            if hasattr(model, 'model_info'):
+                info = model.model_info()
+            else:
+                info = {"model_type": "Unknown", "status": "loaded"}
             
             # Add performance stats
             if app.config['request_count'] > 0:
@@ -119,8 +174,8 @@ def create_app(model):
     return app
 
 def main():
-    """Main application entry point"""
-    print("Starting optimized malware detection service...")
+    """Main application entry point - This is a fallback, use __main__.py instead"""
+    print("Warning: Running apps.py directly. Use __main__.py for proper startup.")
     
     # Configuration from environment variables
     model_path = envparse.env("DF_MODEL_PATH", cast=str, 
@@ -144,7 +199,8 @@ def main():
             model = OptimizedNFSModel()
         
         print("Model loaded successfully!")
-        print(f"Model info: {model.model_info()}")
+        if hasattr(model, 'model_info'):
+            print(f"Model info: {model.model_info()}")
         
     except Exception as e:
         print(f"Error loading model: {e}")
