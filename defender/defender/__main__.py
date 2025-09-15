@@ -86,8 +86,9 @@ if __name__ == "__main__":
                 
     except Exception as e:
         print(f"❌ Error loading models: {e}")
-        print("⚠️  Using NFSBehemotModel as final fallback")
-        model = NFSBehemotModel()
+        print("⚠️  Using OptimizedNFSModel as final fallback")
+        from apps import OptimizedNFSModel
+        model = OptimizedNFSModel()
 
     # Create Flask app
     print("🔧 Creating Flask application...")
