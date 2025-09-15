@@ -1,58 +1,35 @@
-# Multi-stage build for optimized malware detection service
-FROM python:3.8-slim as builder
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Copy and install requirements
-COPY defender/requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-#############################
-# Production image
-#############################
-FROM python:3.8-slim
-
-# Install runtime dependencies only
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy virtual environment from builder
-COPY --from=builder /opt/venv /opt/venv
-
-# Copy ALL application code (the key fix!)
-COPY . /opt/app/
-
-# Create non-root user for security
-RUN groupadd -r defender && useradd --no-log-init -r -g defender defender
-RUN chown -R defender:defender /opt/app
-USER defender
+FROM python:3.9-slim
 
 # Set working directory
-WORKDIR /opt/app/
+WORKDIR /app
 
-# Setup environment
-EXPOSE 8080
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-# Environment variables
-ENV PATH="/opt/venv/bin:$PATH"
-ENV PYTHONPATH="/opt/app"
-ENV DF_MODEL_PATH="defender/defender/models/nfs_full.pickle"
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy your application files
+COPY defender/ ./defender/
+COPY *.py ./
+
+# Set environment variables for your model
+ENV DF_MODEL_PATH="defender/models/nfs_full.pickle"
 ENV DF_PORT=8080
 
-# Memory optimization settings
-ENV PYTHONHASHSEED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Create non-root user for security
+RUN useradd -m -u 1000 defender && chown -R defender:defender /app
+USER defender
 
-# Run the optimized application - Fixed path!
-CMD ["python", "defender/optimized_flask_app.py"]
+# Expose the port
+EXPOSE 8080
+
+# Health check - Updated to match your endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
+
+# Use your working main.py as entry point
+CMD ["python", "main.py", "8080"]
