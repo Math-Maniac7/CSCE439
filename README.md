@@ -1,3 +1,9 @@
+How To Run:
+
+Install Docker Desktop
+
+Open Powershell
+
 docker pull ubuntu:22.04
 
 docker run -it --privileged -v /var/run/docker.sock:/var/run/docker.sock ubuntu:22.04 bash
