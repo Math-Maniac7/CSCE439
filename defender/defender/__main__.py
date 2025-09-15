@@ -5,7 +5,11 @@ from defender.apps import create_app
 # CUSTOMIZE: import model to be used
 from defender.models.ember_model import StatefulNNEmberModel
 from defender.models.nfs_behemot_model import NFSBehemotModel
+<<<<<<< HEAD
 from defender.models.nfs_commite_model import NFSCommiteBehemotModel
+=======
+#from defender.models.nfs_commite_model import NFSCommiteBehemotModel
+>>>>>>> 7d866ed3194d8fd99f70794f4077561100465cd9
 from defender.models.nfs_model import PEAttributeExtractor, NFSModel, NeedForSpeedModel
 
 if __name__ == "__main__":

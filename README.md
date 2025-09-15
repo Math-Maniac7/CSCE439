@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!--
 ---
 page_type: sample
@@ -58,3 +59,32 @@ provided by the bot. You will only need to do this once across all repos using o
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
 For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+=======
+*How To Run:*
+
+1. Install Docker Desktop
+
+2. Open Powershell
+
+docker pull ubuntu:22.04
+
+docker run -it --privileged -v /var/run/docker.sock:/var/run/docker.sock ubuntu:22.04 bash
+
+apt update
+
+apt install -y docker.io curl
+
+git clone -b FreshInstall https://github.com/Math-Maniac7/CSCE439.git
+
+cd CSCE439
+
+cd defender
+
+docker build -t malware-defense .
+
+docker run --memory=1g -p 8080:8080 malware-defense
+
+*On seperate bash console:*
+
+curl -X GET http://localhost:8080/model
+>>>>>>> 7d866ed3194d8fd99f70794f4077561100465cd9

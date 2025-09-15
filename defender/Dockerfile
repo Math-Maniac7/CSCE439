@@ -14,6 +14,14 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # copy and install python requirements + ember from github
 COPY docker-requirements.txt .
+<<<<<<< HEAD
+=======
+
+# upgrade pip so wheels resolve cleanly
+RUN pip install --no-cache-dir --upgrade pip
+
+
+>>>>>>> 7d866ed3194d8fd99f70794f4077561100465cd9
 RUN pip install --no-cache-dir -r docker-requirements.txt \
  && pip install --no-cache-dir git+https://github.com/endgameinc/ember.git
 
@@ -71,4 +79,8 @@ CMD ["python","-m","defender"]
 ## TO RUN IMAGE (ENVIRONMENTAL VARIABLES DECLARED ABOVE)
 # docker run -itp 8080:8080 ember
 ## TO RUN IMAGE (OVERRIDE ENVIRONMENTAL VARIABLES DECLARED ABOVE)
+<<<<<<< HEAD
 # docker run -itp 8080:8080 --env DF_MODEL_GZ_PATH="models/ember_model.txt.gz" --env DF_MODEL_THRESH=0.8336 --env DF_MODEL_NAME=myember ember
+=======
+# docker run -itp 8080:8080 --env DF_MODEL_GZ_PATH="models/ember_model.txt.gz" --env DF_MODEL_THRESH=0.8336 --env DF_MODEL_NAME=myember ember
+>>>>>>> 7d866ed3194d8fd99f70794f4077561100465cd9
