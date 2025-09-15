@@ -406,6 +406,14 @@ class NFSModel():
             self.clf = RandomForestClassifier(n_estimators=10, random_state=42)
             print("Using dummy classifier as fallback")
 
+    def model_info(self):
+            return {
+                "name": "NFSModel",
+                "version": "1.0",
+                "type": "PE malware classifier",
+                "description": "Random Forest-based PE file analyzer"
+            }
+    
     def predict(self, bytez: bytes) -> int:
         try:
             pe_att_ext = PEAttributeExtractor(bytez)
