@@ -14,6 +14,11 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # copy and install python requirements + ember from github
 COPY docker-requirements.txt .
+
+# upgrade pip so wheels resolve cleanly
+RUN pip install --no-cache-dir --upgrade pip
+
+
 RUN pip install --no-cache-dir -r docker-requirements.txt \
  && pip install --no-cache-dir git+https://github.com/endgameinc/ember.git
 
