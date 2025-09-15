@@ -1,8 +1,8 @@
-How To Run:
+*How To Run:*
 
-Install Docker Desktop
+1. Install Docker Desktop
 
-Open Powershell
+2. Open Powershell
 
 docker pull ubuntu:22.04
 
@@ -22,6 +22,6 @@ docker build -t malware-defense .
 
 docker run --memory=1g -p 8080:8080 malware-defense
 
-On seperate bash console:
+*On seperate bash console:*
 
 curl -X GET http://localhost:8080/model
