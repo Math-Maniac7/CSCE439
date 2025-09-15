@@ -8,16 +8,15 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
+# Copy requirements from the correct location and install Python dependencies
+COPY defender/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy your application files
-COPY defender/ ./defender/
-COPY *.py ./
+# Copy your entire project structure
+COPY . .
 
 # Set environment variables for your model
-ENV DF_MODEL_PATH="defender/models/nfs_full.pickle"
+ENV DF_MODEL_PATH="defender/defender/models/nfs_full.pickle"
 ENV DF_PORT=8080
 
 # Create non-root user for security
@@ -27,9 +26,10 @@ USER defender
 # Expose the port
 EXPOSE 8080
 
-# Health check - Updated to match your endpoint
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
 
-# Use your main.py from defender/defender folder
-CMD ["python", "defender/defender/__main__.py", "8080"]
+# Set working directory to defender and run the module
+WORKDIR /app/defender
+CMD ["python", "defender/__main__.py", "8080"]
