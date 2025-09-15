@@ -6,3 +6,4 @@ annoy
 pefile
 numpy
 tqdm
+pandas
