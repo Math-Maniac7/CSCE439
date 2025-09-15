@@ -12,7 +12,7 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy and install requirements
-COPY requirements.txt .
+COPY defender/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
@@ -29,23 +29,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
 
-# Copy application code
-COPY defender /opt/defender/defender
+# Copy ALL application code (the key fix!)
+COPY . /opt/app/
+
+# Create non-root user for security
+RUN groupadd -r defender && useradd --no-log-init -r -g defender defender
+RUN chown -R defender:defender /opt/app
+USER defender
+
+# Set working directory
+WORKDIR /opt/app/
 
 # Setup environment
 EXPOSE 8080
 
-# Create non-root user for security
-RUN groupadd -r defender && useradd --no-log-init -r -g defender defender
-USER defender
-
-# Set working directory
-WORKDIR /opt/defender/
-
 # Environment variables
 ENV PATH="/opt/venv/bin:$PATH"
-ENV PYTHONPATH="/opt/defender"
-ENV DF_MODEL_PATH="models/nfs_full.pickle"
+ENV PYTHONPATH="/opt/app"
+ENV DF_MODEL_PATH="defender/defender/models/nfs_full.pickle"
 ENV DF_PORT=8080
 
 # Memory optimization settings
@@ -53,5 +54,5 @@ ENV PYTHONHASHSEED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Run the optimized application
-CMD ["python", "-m", "defender.optimized_flask_app"]
+# Run the optimized application - Fixed path!
+CMD ["python", "defender/optimized_flask_app.py"]
