@@ -31,5 +31,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8080/health')" || exit 1
 
-# Use your working main.py as entry point
-CMD ["python", "main.py", "8080"]
+# Use your main.py from defender/defender folder
+CMD ["python", "defender/defender/main.py", "8080"]
