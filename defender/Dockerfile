@@ -1,86 +1,72 @@
-FROM python:3.7-slim
+FROM python:3.8-slim
+
+#############################
+# INSTALL SYSTEM DEPENDENCIES
+#############################
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    libgomp1 \
+ && rm -rf /var/lib/apt/lists/*
 
 #############################
 # INSTALL PYTHON DEPENDENCIES
 #############################
 
-# install git for pip install git+https://
-RUN apt-get -o Acquire::Max-FutureTime=100000 update \
- && apt-get install -y --no-install-recommends build-essential git
-
-# create a virtual environment
+# Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# copy and install python requirements + ember from github
+# Copy requirements and install
 COPY docker-requirements.txt .
-<<<<<<< HEAD
-=======
-
-# upgrade pip so wheels resolve cleanly
-RUN pip install --no-cache-dir --upgrade pip
-
-
->>>>>>> 7d866ed3194d8fd99f70794f4077561100465cd9
-RUN pip install --no-cache-dir -r docker-requirements.txt \
- && pip install --no-cache-dir git+https://github.com/endgameinc/ember.git
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r docker-requirements.txt
 
 #############################
-# REBASE & DEPLOY CODE
+# COPY APPLICATION CODE
 #############################
 
-# rebase to make a smaller image
-FROM python:3.7-slim
-
-# required libgomp1 for ember
-RUN apt-get -o Acquire::Max-FutureTime=100000 update \
-    && apt-get -y --no-install-recommends install \
-        libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
-
-# copy python virtual env (all dependencies) from previous image
-COPY --from=0 /opt/venv /opt/venv
-
-# copy defender code to /opt/defender/defender
+# Copy the defender application
 COPY defender /opt/defender/defender
 
+# Copy utility scripts
+COPY create_dummy_models.py /opt/defender/
+
 #############################
-# SETUP ENVIRONMENT
+# SETUP APPLICATION
 #############################
 
-# open port 8080
-EXPOSE 8080
+WORKDIR /opt/defender
 
-# add a defender user and switch user
+# Create dummy models if real ones don't exist
+RUN python create_dummy_models.py
+
+# Create non-root user
 RUN groupadd -r defender && useradd --no-log-init -r -g defender defender
+RUN chown -R defender:defender /opt/defender
 USER defender
 
-# change working directory
-WORKDIR /opt/defender/
+#############################
+# CONFIGURE RUNTIME
+#############################
 
-# update environmental variables
+# Set environment variables
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH="/opt/defender"
+ENV DF_MODEL_NAME="nfs"
+ENV DF_MODEL_THRESH=0.9
 
-# one may tune model file / threshold / name via environmental variables
-ENV DF_MODEL_GZ_PATH models/ember_model.txt.gz
-ENV DF_MODEL_THRESH 0.8336
-ENV DF_MODEL_NAME ember
-ENV DF_MODEL_BALL_THRESH 0.25
-ENV DF_MODEL_HISTORY 10000
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
 #############################
-# RUN CODE
+# START APPLICATION
 #############################
-CMD ["python","-m","defender"]
 
-## TO BUILD IMAGE:
-# docker build -t ember .
-## TO RUN IMAGE (ENVIRONMENTAL VARIABLES DECLARED ABOVE)
-# docker run -itp 8080:8080 ember
-## TO RUN IMAGE (OVERRIDE ENVIRONMENTAL VARIABLES DECLARED ABOVE)
-<<<<<<< HEAD
-# docker run -itp 8080:8080 --env DF_MODEL_GZ_PATH="models/ember_model.txt.gz" --env DF_MODEL_THRESH=0.8336 --env DF_MODEL_NAME=myember ember
-=======
-# docker run -itp 8080:8080 --env DF_MODEL_GZ_PATH="models/ember_model.txt.gz" --env DF_MODEL_THRESH=0.8336 --env DF_MODEL_NAME=myember ember
->>>>>>> 7d866ed3194d8fd99f70794f4077561100465cd9
+CMD ["python", "-m", "defender"]
