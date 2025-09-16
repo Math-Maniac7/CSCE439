@@ -25,4 +25,4 @@ docker run --memory=1g -p 8080:8080 malware-defense
 *On seperate bash console:*
 
 curl -X GET http://localhost:8080/model
->>>>>>> 7d866ed3194d8fd99f70794f4077561100465cd9
+
