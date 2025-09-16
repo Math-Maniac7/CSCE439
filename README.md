@@ -13,7 +13,7 @@ apt update
 
 apt install -y docker.io curl
 
-git clone -b FreshInstall https://github.com/Math-Maniac7/CSCE439.git
+git clone -b main https://github.com/Math-Maniac7/CSCE439.git
 
 cd CSCE439
 
