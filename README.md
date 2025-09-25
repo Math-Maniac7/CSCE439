@@ -27,5 +27,7 @@ docker run --memory=1g -p 8080:8080 malware-defense
 
 curl -X GET http://localhost:8080/model
 
-Testing files
+*Testing files:*
+
+
 curl -X POST --data-binary @10_modified.exe http://localhost:8080/ -H "Content-Type: application/octet-stream"
