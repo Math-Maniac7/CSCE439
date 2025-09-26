@@ -50,7 +50,7 @@ class PEAttributeExtractor():
             return 0
         entropy=0
         for x in range(256):
-            p_x = float(self.bytez.count(bytes(x)))/len(self.bytez)
+            p_x = float(self.bytez.count(bytes([x])))/len(self.bytez)
             if p_x>0:
                 entropy += - p_x*math.log(p_x, 2)
         return entropy
@@ -90,8 +90,8 @@ class PEAttributeExtractor():
             # EMBER only
             "has_resources": int(self.lief_binary.has_resources),
             # EMBER only
-            "has_signature": int(self.lief_binary.has_signature),
-            # EMBER only
+            "has_signature": 0
+	    # EMBER only
             "has_tls": int(self.lief_binary.has_tls),
             # EMBER only
             "symbols": len(self.lief_binary.symbols),
