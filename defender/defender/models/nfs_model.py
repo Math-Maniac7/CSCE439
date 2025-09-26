@@ -415,7 +415,7 @@ class NFSModel:
             base_path = os.path.dirname(model_path)
             self.model_path = model_path
         else:
-            base_path = "defender/defender/models"
+            base_path = "defender/models"
             self.model_path = os.path.join(base_path, "nfs_full.pickle")
             
         # Updated paths to match your structure
