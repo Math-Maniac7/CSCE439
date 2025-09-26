@@ -5,11 +5,14 @@ import math
 import numpy as np
 import pandas as pd
 import pickle
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.ensemble import RandomForestClassifier
+from copy import deepcopy
 
 class PEAttributeExtractor:
-    """Extract attributes from PE files using LIEF - simplified version"""
+    """Extract attributes from PE files using LIEF"""
     
     def __init__(self, bytez):
         self.bytez = bytez
@@ -20,27 +23,41 @@ class PEAttributeExtractor:
         self.exports = ""
         
         try:
+            # Parse using LIEF
             self.lief_binary = lief.PE.parse(list(bytez))
+            print(f"✅ LIEF parsing successful")
         except Exception as e:
-            print(f"Warning: Could not parse PE with LIEF: {e}")
+            print(f"❌ Error parsing PE with LIEF: {e}")
             self.lief_binary = None
 
     def extract_string_metadata(self):
         """Extract string-based metadata from PE bytes"""
         if not self.bytez:
-            return {'string_paths': 0, 'string_urls': 0, 'string_registry': 0, 'string_MZ': 0}
+            return {
+                'string_paths': 0,
+                'string_urls': 0,
+                'string_registry': 0,
+                'string_MZ': 0
+            }
             
+        # Occurrences of the string 'C:\'. Not actually extracting the path
         paths = re.compile(b'c:\\\\', re.IGNORECASE)
+        # Occurrences of http:// or https://. Not actually extracting the URLs
         urls = re.compile(b'https?://', re.IGNORECASE)
+        # Occurrences of the string prefix HKEY_. Not actually extracting registry names
         registry = re.compile(b'HKEY_')
+        # Crude evidence of an MZ header (dropper?) somewhere in the byte stream
         mz = re.compile(b'MZ')
         
-        return {
+        result = {
             'string_paths': len(paths.findall(self.bytez)),
             'string_urls': len(urls.findall(self.bytez)),
             'string_registry': len(registry.findall(self.bytez)),
             'string_MZ': len(mz.findall(self.bytez))
         }
+        
+        print(f"🔍 String metadata: {result}")
+        return result
 
     def extract_entropy(self):
         """Calculate Shannon entropy of the PE file"""
@@ -52,6 +69,8 @@ class PEAttributeExtractor:
             p_x = float(self.bytez.count(x.to_bytes(1, 'little'))) / len(self.bytez)
             if p_x > 0:
                 entropy += -p_x * math.log(p_x, 2)
+        
+        print(f"📈 Entropy: {entropy:.3f}")
         return entropy
 
     def extract_identify(self):
@@ -60,7 +79,10 @@ class PEAttributeExtractor:
     
     def extract(self):
         """Extract all PE attributes"""
+        print(f"🔍 Starting PE analysis of {len(self.bytez)} bytes")
+        
         if self.lief_binary is None:
+            print("⚠️  LIEF parsing failed, using minimal attributes")
             return self._get_minimal_attributes()
         
         try:
@@ -77,6 +99,8 @@ class PEAttributeExtractor:
                 "has_tls": int(self.lief_binary.has_tls),
                 "symbols": len(self.lief_binary.symbols),
             })
+
+            print(f"📊 General info - Size: {self.attributes['size']}, Imports: {self.attributes['imports']}, Exports: {self.attributes['exports']}")
 
             # Get header info
             self.attributes.update({
@@ -124,7 +148,9 @@ class PEAttributeExtractor:
             })
 
             # Get entropy
-            self.attributes.update({"entropy": self.extract_entropy()})
+            self.attributes.update({
+                "entropy": self.extract_entropy()
+            })
 
             # Get string metadata
             self.attributes.update(self.extract_string_metadata())
@@ -133,49 +159,100 @@ class PEAttributeExtractor:
             if self.lief_binary.has_imports:
                 self.libraries = " ".join([l for l in self.lief_binary.libraries])
                 self.functions = " ".join([f.name for f in self.lief_binary.imported_functions])
+                print(f"📚 Found {len(self.lief_binary.libraries)} libraries: {self.libraries[:100]}...")
+                print(f"🔧 Found {len(self.lief_binary.imported_functions)} functions: {self.functions[:100]}...")
+            else:
+                print("📚 No imports found")
             
             self.attributes.update({"functions": self.functions, "libraries": self.libraries})
 
             # Get exports
             if self.lief_binary.has_exports:
                 self.exports = " ".join([f.name for f in self.lief_binary.exported_functions])
+                print(f"📤 Found {len(self.lief_binary.exported_functions)} exports: {self.exports[:100]}...")
+            else:
+                print("📤 No exports found")
             
             self.attributes.update({"exports_list": self.exports})
+
+            # Get identify
             self.attributes.update({"identify": self.extract_identify()})
+
+            print(f"📋 Total attributes extracted: {len(self.attributes)}")
+            print(f"📋 Sample attributes: {list(self.attributes.keys())[:10]}")
 
             return self.attributes
             
         except Exception as e:
-            print(f"Error extracting attributes: {e}")
+            print(f"❌ Error extracting attributes: {e}")
+            import traceback
+            traceback.print_exc()
             return self._get_minimal_attributes()
     
     def _get_minimal_attributes(self):
         """Return minimal attributes when parsing fails"""
-        return {
+        minimal = {
             "size": len(self.bytez) if self.bytez else 0,
-            "virtual_size": 0, "has_debug": 0, "imports": 0, "exports": 0,
-            "has_relocations": 0, "has_resources": 0, "has_signature": 0,
-            "has_tls": 0, "symbols": 0, "timestamp": 0, "machine": "0",
-            "numberof_sections": 0, "numberof_symbols": 0, "pointerto_symbol_table": 0,
-            "sizeof_optional_header": 0, "characteristics": 0, "characteristics_list": "",
-            "baseof_code": 0, "baseof_data": 0, "dll_characteristics": 0,
-            "dll_characteristics_list": "", "file_alignment": 0, "imagebase": 0,
-            "magic": "PE32", "PE_TYPE": 267, "major_image_version": 0,
-            "minor_image_version": 0, "major_linker_version": 0, "minor_linker_version": 0,
-            "major_operating_system_version": 0, "minor_operating_system_version": 0,
-            "major_subsystem_version": 0, "minor_subsystem_version": 0,
-            "numberof_rva_and_size": 0, "sizeof_code": 0, "sizeof_headers": 0,
-            "sizeof_heap_commit": 0, "sizeof_image": 0, "sizeof_initialized_data": 0,
-            "sizeof_uninitialized_data": 0, "subsystem": "UNKNOWN", "entropy": 0,
-            "string_paths": 0, "string_urls": 0, "string_registry": 0, "string_MZ": 0,
-            "functions": "", "libraries": "", "exports_list": "", "identify": ""
+            "virtual_size": 0,
+            "has_debug": 0,
+            "imports": 0,
+            "exports": 0,
+            "has_relocations": 0,
+            "has_resources": 0,
+            "has_signature": 0,
+            "has_tls": 0,
+            "symbols": 0,
+            "timestamp": 0,
+            "machine": "MACHINE.UNKNOWN",
+            "numberof_sections": 0,
+            "numberof_symbols": 0,
+            "pointerto_symbol_table": 0,
+            "sizeof_optional_header": 0,
+            "characteristics": 0,
+            "characteristics_list": "",
+            "baseof_code": 0,
+            "baseof_data": 0,
+            "dll_characteristics": 0,
+            "dll_characteristics_list": "",
+            "file_alignment": 0,
+            "imagebase": 0,
+            "magic": "PE32",
+            "PE_TYPE": 267,
+            "major_image_version": 0,
+            "minor_image_version": 0,
+            "major_linker_version": 0,
+            "minor_linker_version": 0,
+            "major_operating_system_version": 0,
+            "minor_operating_system_version": 0,
+            "major_subsystem_version": 0,
+            "minor_subsystem_version": 0,
+            "numberof_rva_and_size": 0,
+            "sizeof_code": 0,
+            "sizeof_headers": 0,
+            "sizeof_heap_commit": 0,
+            "sizeof_image": 0,
+            "sizeof_initialized_data": 0,
+            "sizeof_uninitialized_data": 0,
+            "subsystem": "UNKNOWN",
+            "entropy": 0,
+            "string_paths": 0,
+            "string_urls": 0,
+            "string_registry": 0,
+            "string_MZ": 0,
+            "functions": "",
+            "libraries": "",
+            "exports_list": "",
+            "identify": ""
         }
+        
+        print(f"⚠️  Using minimal attributes: {len(minimal)} attributes")
+        return minimal
 
 
 class PEFeatureExtractor:
-    """Feature extractor that works with the original nfs_full.pickle model"""
+    """Feature extractor that matches the original implementation"""
     
-    # These are the exact features used in the original model
+    # These MUST match the original training data
     NUMERICAL_ATTRIBUTES = [
         'baseof_code', 'baseof_data', 'characteristics', 'dll_characteristics', 
         'entropy', 'file_alignment', 'imagebase', 'machine', 'magic',
@@ -187,70 +264,62 @@ class PEFeatureExtractor:
     
     TEXTUAL_ATTRIBUTES = ['identify', 'libraries', 'functions']
     
-    def __init__(self, file_bytes, extractor_path=None, scaler_path=None):
+    def __init__(self, file_bytes, extractor_path, scaler_path):
+        print(f"🔧 Initializing feature extractor...")
+        print(f"🔧 Extractor path: {extractor_path}")
+        print(f"🔧 Scaler path: {scaler_path}")
+        
         # Initialize PE attribute extractor
         pe_a = PEAttributeExtractor(file_bytes)
+        # Get attributes values and names
         atts = pe_a.extract()
         
         # Create dataframe with obtained values
         self.attributes = pd.DataFrame([atts])
+        print(f"📋 Attributes DataFrame shape: {self.attributes.shape}")
+        print(f"📋 Attributes columns: {list(self.attributes.columns)[:10]}...")
         
-        # Try to load extractor and scaler, create fallbacks if not available
-        self.extractor = self._load_or_create_extractor(extractor_path)
-        self.scaler = self._load_or_create_scaler(scaler_path)
-        
-    def _load_or_create_extractor(self, extractor_path):
-        """Load TF-IDF extractor or create a basic one"""
-        if extractor_path and os.path.exists(extractor_path):
-            try:
-                with open(extractor_path, 'rb') as f:
-                    return pickle.load(f)
-            except Exception as e:
-                print(f"Warning: Could not load extractor: {e}")
-        
-        # Create basic TF-IDF extractor
-        print("Creating basic TF-IDF extractor...")
-        extractor = TfidfVectorizer(max_features=100, ngram_range=(1, 2))
-        # Fit on some basic patterns
-        basic_texts = [
-            "kernel32.dll user32.dll ntdll.dll",
-            "CreateFile ReadFile WriteFile",
-            "RegOpenKey RegSetValue",
-            ""  # Empty string for missing data
-        ]
-        extractor.fit(basic_texts)
-        return extractor
-        
-    def _load_or_create_scaler(self, scaler_path):
-        """Load MinMax scaler or create a basic one"""
-        if scaler_path and os.path.exists(scaler_path):
-            try:
-                with open(scaler_path, 'rb') as f:
-                    return pickle.load(f)
-            except Exception as e:
-                print(f"Warning: Could not load scaler: {e}")
-        
-        # Create basic scaler
-        print("Creating basic MinMax scaler...")
-        scaler = MinMaxScaler()
-        # Fit on reasonable ranges for PE features
-        dummy_data = np.random.random((100, 200))  # Assume ~200 total features
-        scaler.fit(dummy_data)
-        return scaler
+        # Load extractor and scaler
+        try:
+            with open(extractor_path, 'rb') as f:
+                self.extractor = pickle.load(f)
+            print(f"✅ Loaded TF-IDF extractor with {len(self.extractor.vocabulary_)} vocabulary terms")
+        except Exception as e:
+            print(f"❌ Error loading extractor: {e}")
+            # Create dummy extractor
+            self.extractor = TfidfVectorizer(max_features=100)
+            self.extractor.fit(["dummy text"])
+            print(f"⚠️  Created dummy TF-IDF extractor")
+            
+        try:
+            with open(scaler_path, 'rb') as f:
+                self.scaler = pickle.load(f)
+            print(f"✅ Loaded scaler expecting {self.scaler.n_features_in_} features")
+        except Exception as e:
+            print(f"❌ Error loading scaler: {e}")
+            # Create dummy scaler
+            self.scaler = MinMaxScaler()
+            self.scaler.fit([[0] * 100])
+            print(f"⚠️  Created dummy scaler")
         
     def extract_features(self):
-        """Extract features for the model"""
+        """Extract features exactly like the original"""
+        print(f"🔧 Starting feature extraction...")
+        
         try:
             # Start with numerical attributes
             numerical_features = []
+            missing_attrs = []
+            
             for attr in self.NUMERICAL_ATTRIBUTES:
                 if attr in self.attributes.columns:
                     val = self.attributes[attr].iloc[0]
                     # Convert string representations to numbers
                     if isinstance(val, str):
                         try:
+                            # Try to extract numeric part from strings like "MACHINE.I386"
                             if 'MACHINE.' in str(val):
-                                val = hash(val) % 10000
+                                val = hash(val) % 10000  # Convert to consistent number
                             elif 'PE32' in str(val):
                                 val = 267 if 'PE32' in str(val) else 523
                             else:
@@ -260,94 +329,138 @@ class PEFeatureExtractor:
                     numerical_features.append(float(val))
                 else:
                     numerical_features.append(0.0)
+                    missing_attrs.append(attr)
+            
+            if missing_attrs:
+                print(f"⚠️  Missing numerical attributes: {missing_attrs[:5]}...")
             
             # Convert to numpy array
             features = np.array([numerical_features])
+            print(f"📊 Numerical features shape: {features.shape}")
+            print(f"📊 Numerical features sample: {features[0][:10]}...")  # First 10 values
             
-            # Extract features from textual attributes
-            for attr in self.TEXTUAL_ATTRIBUTES:
-                text = ""
-                if attr in self.attributes.columns:
-                    text = str(self.attributes[attr].iloc[0])
-                    if text == "nan" or text == "None":
-                        text = ""
+            # Extract features from each textual attribute
+            for a in self.TEXTUAL_ATTRIBUTES:
+                print(f"🔤 Processing textual attribute: {a}")
+                
+                text_content = ""
+                if a in self.attributes.columns:
+                    text_content = str(self.attributes[a].iloc[0])
+                    if text_content in ['nan', 'None', 'null']:
+                        text_content = ""
+                
+                print(f"🔤 Text content for {a}: '{text_content[:100]}...'")  # First 100 chars
                 
                 try:
-                    text_features = self.extractor.transform([text])
-                    features = np.concatenate((features, text_features.toarray()), axis=1)
+                    # extract features from current attribute
+                    train_texts = self.extractor.transform([text_content])
+                    print(f"🔤 TF-IDF features for {a}: shape {train_texts.shape}, non-zero: {train_texts.nnz}")
+                    
+                    # concatenate with numerical attributes
+                    features = np.concatenate((features, train_texts.toarray()), axis=1)
+                    print(f"🔤 Combined features shape after {a}: {features.shape}")
+                    
                 except Exception as e:
-                    print(f"Warning: Error processing {attr}: {e}")
-                    # Add zeros if text processing fails
-                    dummy_features = np.zeros((1, 100))
+                    print(f"❌ Error processing textual attribute {a}: {e}")
+                    # Add dummy features if text processing fails
+                    dummy_features = np.zeros((1, 100))  # Assuming 100 features
                     features = np.concatenate((features, dummy_features), axis=1)
+                    print(f"⚠️  Added dummy features for {a}")
             
-            # Apply scaling
+            print(f"⚖️  Features before scaling: shape {features.shape}, min {features.min():.6f}, max {features.max():.6f}")
+            print(f"⚖️  Non-zero features before scaling: {np.count_nonzero(features)}/{features.size}")
+            
+            # Normalize using the scaler
             try:
-                # Only scale if the feature dimensions match
-                if features.shape[1] <= self.scaler.n_features_in_:
-                    # Pad with zeros if we have fewer features
-                    if features.shape[1] < self.scaler.n_features_in_:
-                        padding = np.zeros((1, self.scaler.n_features_in_ - features.shape[1]))
-                        features = np.concatenate((features, padding), axis=1)
-                    features = self.scaler.transform(features)
-                else:
-                    # Truncate if we have too many features
-                    features = features[:, :self.scaler.n_features_in_]
-                    features = self.scaler.transform(features)
+                original_shape = features.shape
+                features = self.scaler.transform(features)
+                print(f"✅ Scaling successful: {original_shape} -> {features.shape}")
             except Exception as e:
-                print(f"Warning: Scaling failed: {e}, using raw features")
-                # Normalize manually if scaling fails
+                print(f"❌ Error in scaling: {e}")
+                # If scaling fails, just normalize manually
                 if features.max() > 0:
-                    features = features / features.max()
+                    features = features / (np.max(features) + 1e-8)
+                    print(f"⚠️  Manual normalization applied")
+                else:
+                    print(f"⚠️  All features are zero - this may indicate a problem")
+            
+            print(f"✅ Final features: shape {features.shape}, min={features.min():.6f}, max={features.max():.6f}, mean={features.mean():.6f}")
+            print(f"✅ Non-zero features: {np.count_nonzero(features)}/{features.size}")
             
             return features
             
         except Exception as e:
-            print(f"Error in feature extraction: {e}")
+            print(f"❌ Error in feature extraction: {e}")
             import traceback
             traceback.print_exc()
-            # Return basic feature vector if everything fails
-            return np.zeros((1, 100))
+            # Return dummy features if everything fails
+            dummy_features = np.zeros((1, 500))
+            print(f"⚠️  Returning dummy features: {dummy_features.shape}")
+            return dummy_features
 
 
 class NFSModel:
-    """Simple NFSModel that uses your existing nfs_full.pickle"""
+    """Fixed NFSModel that properly handles the feature pipeline"""
     
-    def __init__(self, model_path="defender/models/nfs_full.pickle"):
-        self.model_path = model_path
-        self.classifier = None
+    def __init__(self, model_file=None, model_path=None):
+        print(f"🔧 Initializing NFSModel...")
         
-        # Paths for extractor and scaler (optional)
-        base_dir = os.path.dirname(model_path) if os.path.dirname(model_path) else "defender/models"
-        self.extractor_path = os.path.join(base_dir, "nfs_behemot", "nfs_extractor_tfidf.pkl")
-        self.scaler_path = os.path.join(base_dir, "nfs_behemot", "nfs_scaler_minmax.pkl")
+        self.classifier = None
+        self.model_path = model_path
+        self.extractor_path = None
+        self.scaler_path = None
+        
+        # Set up paths - FIXED for your directory structure
+        if model_path:
+            base_path = os.path.dirname(model_path)
+            self.model_path = model_path
+        else:
+            base_path = "defender/defender/models"
+            self.model_path = os.path.join(base_path, "nfs_full.pickle")
+            
+        # Updated paths to match your structure
+        self.extractor_path = os.path.join(base_path, "nfs_behemot", "nfs_extractor_tfidf.pkl")
+        self.scaler_path = os.path.join(base_path, "nfs_behemot", "nfs_scaler_minmax.pkl")
+        
+        print(f"🔧 Model path: {self.model_path}")
+        print(f"🔧 Extractor path: {self.extractor_path}")
+        print(f"🔧 Scaler path: {self.scaler_path}")
         
         # Load the main classifier
-        self._load_classifier()
-        
-    def _load_classifier(self):
-        """Load the classifier from pickle file"""
-        if not os.path.exists(self.model_path):
-            raise FileNotFoundError(f"Model file not found: {self.model_path}")
-            
-        try:
-            with open(self.model_path, 'rb') as f:
-                self.classifier = pickle.load(f)
-            print(f"Successfully loaded classifier from {self.model_path}")
-            
-            # Print some info about the loaded model
-            if hasattr(self.classifier, 'n_features_in_'):
-                print(f"Model expects {self.classifier.n_features_in_} features")
-            if hasattr(self.classifier, 'classes_'):
-                print(f"Model classes: {self.classifier.classes_}")
+        if model_file:
+            try:
+                model_file.seek(0)
+                self.classifier = pickle.load(model_file)
+                print("✅ Successfully loaded classifier from file object")
+            except Exception as e:
+                print(f"❌ Error loading classifier from file object: {e}")
+        elif self.model_path and os.path.exists(self.model_path):
+            try:
+                with open(self.model_path, 'rb') as f:
+                    self.classifier = pickle.load(f)
+                print(f"✅ Successfully loaded classifier from {self.model_path}")
                 
-        except Exception as e:
-            raise RuntimeError(f"Error loading classifier: {e}")
+                # Print classifier info
+                if hasattr(self.classifier, 'n_features_in_'):
+                    print(f"📊 Model expects {self.classifier.n_features_in_} features")
+                if hasattr(self.classifier, 'classes_'):
+                    print(f"📊 Model classes: {self.classifier.classes_}")
+                if hasattr(self.classifier, 'n_estimators'):
+                    print(f"📊 Model estimators: {self.classifier.n_estimators}")
+                    
+            except Exception as e:
+                print(f"❌ Error loading classifier from path: {e}")
+        else:
+            print(f"❌ Model file not found: {self.model_path}")
+        
+        # REMOVED: No more dummy fallback - fail if model doesn't load
+        if self.classifier is None:
+            raise RuntimeError(f"Could not load classifier from {self.model_path}. Please ensure the model file exists and is valid.")
 
     def model_info(self):
         return {
             "name": "NFSModel",
-            "version": "1.0", 
+            "version": "1.0",
             "type": "PE malware classifier",
             "description": f"Model loaded from {self.model_path}",
             "classifier_type": type(self.classifier).__name__ if self.classifier else "Unknown"
@@ -355,34 +468,34 @@ class NFSModel:
     
     def predict(self, bytez: bytes) -> int:
         """Predict if PE file is malware (1) or benign (0)"""
-        if self.classifier is None:
-            raise RuntimeError("No classifier loaded")
-            
         try:
-            print(f"Analyzing PE file of {len(bytez)} bytes")
+            print(f"🔍 Analyzing PE file of {len(bytez)} bytes")
             
-            # Extract features
+            # Extract features using the proper pipeline
             fe = PEFeatureExtractor(bytez, self.extractor_path, self.scaler_path)
             features = fe.extract_features()
             
-            print(f"Extracted features shape: {features.shape}")
+            print(f"✅ Final features shape: {features.shape}")
+            print(f"✅ Features summary: min={features.min():.6f}, max={features.max():.6f}, mean={features.mean():.6f}")
+            print(f"✅ Non-zero features: {np.count_nonzero(features)}/{features.size}")
             
             # Make prediction
             if hasattr(self.classifier, 'predict_proba'):
                 try:
                     proba = self.classifier.predict_proba(features)[0]
-                    print(f"Prediction probabilities: {proba}")
-                    pred = 1 if len(proba) > 1 and proba[1] > 0.5 else 0
-                except:
+                    print(f"🎯 Prediction probabilities: {proba}")
+                    pred = 1 if len(proba) > 1 and proba[1] > 0.5 else 0  # 1 = malware, 0 = benign
+                except Exception as e:
+                    print(f"⚠️  predict_proba failed: {e}, using predict instead")
                     pred = int(self.classifier.predict(features)[0])
             else:
                 pred = int(self.classifier.predict(features)[0])
             
-            print(f"Final prediction: {pred} ({'malware' if pred == 1 else 'benign'})")
+            print(f"🎯 Final prediction: {pred} ({'malware' if pred == 1 else 'benign'})")
             return pred
             
         except Exception as e:
-            print(f"Error in prediction: {e}")
+            print(f"❌ Error in prediction: {e}")
             import traceback
             traceback.print_exc()
             return 1  # Default to malware on error
