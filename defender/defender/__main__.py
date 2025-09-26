@@ -1,4 +1,4 @@
-import os
+erimport os
 import sys
 import envparse
 from defender.apps import create_app
@@ -27,7 +27,7 @@ except ImportError:
 
 if __name__ == "__main__":
     # Retrieve config values from environment variables
-    model_gz_path = envparse.env("DF_MODEL_GZ_PATH", cast=str, default="models/nfs_full.pickle")
+    model_gz_path = envparse.env("DF_MODEL_GZ_PATH", cast=str, default="defender/models/nfs_full.pickle")
     model_thresh = envparse.env("DF_MODEL_THRESH", cast=float, default=0.8336)
     model_name = envparse.env("DF_MODEL_NAME", cast=str, default="nfs")
     model_ball_thresh = envparse.env("DF_MODEL_BALL_THRESH", cast=float, default=0.25)
