@@ -40,7 +40,7 @@ ENV PYTHONPATH="/opt/defender"
 
 # Default model settings (you can override with -e at runtime)
 # Your __main__.py uses a path relative to defender/, so keep the model under defender/models/
-ENV MODEL_PATH="defender/models/pe_lgbm_ember.txt"
+ENV MODEL_PATH="models/pe_lgbm_ember.txt"
 ENV THRESHOLD="0.974798"
 
 EXPOSE 8080
