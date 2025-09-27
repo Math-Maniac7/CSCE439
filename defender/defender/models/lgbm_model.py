@@ -4,9 +4,10 @@ import gzip
 import logging
 import numpy as np
 import lightgbm as lgb
+import importlib, pkgutil, thrember
 
 # Defaults (override via env if you want)
-DEFAULT_MODEL_PATH = os.getenv("MODEL_PATH", "defender/models/pe_lgbm_ember.txt")
+DEFAULT_MODEL_PATH = os.getenv("MODEL_PATH", "models/pe_lgbm_ember.txt")
 DEFAULT_THRESHOLD  = float(os.getenv("THRESHOLD", "0.974798")) 
 ERROR_POLICY       = os.getenv("ERROR_POLICY", "benign").lower()
 
@@ -20,7 +21,7 @@ class Ember2024LightGBMModel:
         self.__name__ = name
         self.model_path = model_path
         self.thresh = float(thresh)
-
+        
         # Load LightGBM booster exported by your trainer (text or gz)
         if model_path.endswith(".gz"):
             with gzip.open(model_path, "rb") as f:
@@ -30,14 +31,33 @@ class Ember2024LightGBMModel:
             self.booster = lgb.Booster(model_file=model_path)
 
         # Feature extractor (EMBER2024 v3 / thrember)
-        try:
-            from thrember import pe_v3  # provided by EMBER2024 install
-        except Exception as e:
-            raise RuntimeError(
-                "Failed to import thrember. Install EMBER2024 (e.g., `pip install .` "
-                "from the repo root) so `thrember` is available."
-            ) from e
-        self._extract_from_bytes = pe_v3.feature_vector_from_bytes
+
+        _extract = None
+        # Try a couple of common paths first (cheap)
+        for path in ("thrember.pe_v3", "thrember.pe.features_v3", "thrember.features.pe_v3"):
+            try:
+                mod = importlib.import_module(path)
+                if hasattr(mod, "feature_vector_from_bytes"):
+                    _extract = mod.feature_vector_from_bytes
+                    break
+            except Exception:
+                pass
+
+        # Fallback: search all thrember submodules for the function
+        if _extract is None:
+            for _, m, _ in pkgutil.walk_packages(thrember.__path__, thrember.__name__ + "."):
+                try:
+                    mod = importlib.import_module(m)
+                    if hasattr(mod, "feature_vector_from_bytes"):
+                        _extract = mod.feature_vector_from_bytes
+                        break
+                except Exception:
+                    continue
+
+        if _extract is None:
+            raise RuntimeError("Could not locate thrember's `feature_vector_from_bytes`.")
+
+        self._extract_from_bytes = _extract
 
         # Fail fast if feature dims don’t match model
         want = int(self.booster.num_feature())
