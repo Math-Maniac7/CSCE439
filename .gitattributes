@@ -1,0 +1,8 @@
+defender/models/*.txt filter=lfs diff=lfs merge=lfs -text
+defender/models/*.txt.gz filter=lfs diff=lfs merge=lfs -text
+defender/defender/models/*.txt filter=lfs diff=lfs merge=lfs -text
+defender/defender/models/*.txt.gz filter=lfs diff=lfs merge=lfs -text
+defender/defender/models/*.joblib filter=lfs diff=lfs merge=lfs -text
+defender/defender/models/*.pkl filter=lfs diff=lfs merge=lfs -text
+defender/defender/models/*.gz filter=lfs diff=lfs merge=lfs -text
+/ filter=lfs diff=lfs merge=lfs -text
