@@ -12,4 +12,4 @@ pefile>=2023.2.7
 
 # EMBER2024 feature extractor (installs the `thrember` package)
 # Pin to a commit for reproducibility if you can:
-git+https://github.com/FutureComputing4AI/EMBER2024.git@main#egg=thrember&subdirectory=src
+git+https://github.com/FutureComputing4AI/EMBER2024.git@main
