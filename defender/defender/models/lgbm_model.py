@@ -41,7 +41,7 @@ def _extract_with_lief(bytez: bytes) -> Dict:
         "id": {"machine": "", "magic": ""},
     }
     try:
-        pe = lief.PE.parse(io.BytesIO(bytez))
+        pe = lief.PE.parse(list(bytez))
     except Exception:
         return out
 
