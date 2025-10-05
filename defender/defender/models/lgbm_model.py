@@ -41,7 +41,7 @@ def _extract_with_lief(bytez: bytes) -> Dict:
         "id": {"machine": "", "magic": ""},
     }
     try:
-        pe = lief.PE.parse(list(bytez))
+        pe = lief.parse(bytez)
     except Exception:
         return out
 
@@ -216,6 +216,8 @@ class LGBMModel:
     def __init__(self, model_file):
         self.threshold = 0.978408
         self.n_features = None
+        self.clf = None
+        self.booster = None
 
         try:
             model_file.seek(0)
