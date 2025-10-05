@@ -9,6 +9,7 @@ RUN apt-get update \
     build-essential \
     git \
     libgomp1 \
+    curl \
  && rm -rf /var/lib/apt/lists/*
 
 #############################
@@ -30,6 +31,9 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 # Copy the defender application
 COPY defender /opt/defender/defender
+
+# Copy model into image
+COPY models/pe_lgbm_ember.pkl /opt/defender/defender/models/pe_lgbm_ember.pkl
 
 # Copy utility scripts
 COPY create_dummy_models.py /opt/defender/
@@ -55,8 +59,9 @@ USER defender
 # Set environment variables
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH="/opt/defender"
-ENV DF_MODEL_NAME="nfs"
-ENV DF_MODEL_THRESH=0.9
+ENV DF_MODEL_NAME="lgb"
+ENV DF_LGB_MODEL_PATH="/opt/defender/defender/models/pe_lgbm_ember.pkl"
+ENV DF_LGB_THRESHOLD=0.978408
 
 # Expose port
 EXPOSE 8080
