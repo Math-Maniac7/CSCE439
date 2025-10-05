@@ -32,9 +32,6 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Copy the defender application
 COPY defender /opt/defender/defender
 
-# Copy model into image
-COPY models/pe_lgbm_ember.pkl /opt/defender/defender/models/pe_lgbm_ember.pkl
-
 # Copy utility scripts
 COPY create_dummy_models.py /opt/defender/
 
