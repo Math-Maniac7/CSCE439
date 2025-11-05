@@ -55,8 +55,8 @@ USER defender
 # Set environment variables
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH="/opt/defender"
-ENV DF_MODEL_NAME="nfs"
-ENV DF_MODEL_THRESH=0.9
+ENV DF_MODEL_NAME="ember"
+ENV DF_MODEL_THRESH=0.8336
 
 # Expose port
 EXPOSE 8080
