@@ -31,3 +31,13 @@ curl -X GET http://localhost:8080/model
 
 
 curl -X POST --data-binary @10_modified.exe http://localhost:8080/ -H "Content-Type: application/octet-stream"
+
+for i in {1..100}; do
+  file="${i}.exe"
+  if [ -f "$file" ]; then
+    echo ">>> Processing: $file"
+    curl -s -X POST --data-binary @"$file" http://localhost:8080/ -H "Content-Type: application/octet-stream"
+    echo -e "\n------------------------------------"
+  fi
+done
+
