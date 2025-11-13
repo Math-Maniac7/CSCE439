@@ -1,44 +1,11 @@
 import pandas as pd
 import numpy as np
-import pickle
 import gc
 import os
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import MinMaxScaler
+import gzip
+import lightgbm as lgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score, confusion_matrix
-
-class SimpleEMBERModel:
-    """Simple model for pre-processed EMBER features"""
-    
-    def __init__(self, classifier=RandomForestClassifier(
-        n_estimators=50,        # Reduced from 100 to 50 trees
-        max_depth=20,           # Limit tree depth to prevent overfitting and speed up
-        max_features='sqrt',    # Use sqrt of features instead of all features
-        n_jobs=-1,             # Use all CPU cores
-        random_state=42,
-        verbose=1              # Show progress
-    )):
-        self.classifier = classifier
-        self.scaler = MinMaxScaler()
-        
-    def fit(self, X, y):
-        """Train the model"""
-        print("Training feature scaler...")
-        X_scaled = self.scaler.fit_transform(X)
-        
-        print("Training classifier...")
-        self.classifier.fit(X_scaled, y)
-        
-    def predict(self, X):
-        """Make predictions"""
-        X_scaled = self.scaler.transform(X)
-        return self.classifier.predict(X_scaled)
-    
-    def predict_proba(self, X):
-        """Get prediction probabilities"""
-        X_scaled = self.scaler.transform(X)
-        return self.classifier.predict_proba(X_scaled)
 
 def load_ember_parquet_incrementally(file_paths, chunk_size=50000):
     """Load EMBER Parquet files incrementally"""
@@ -57,7 +24,7 @@ def load_ember_parquet_incrementally(file_paths, chunk_size=50000):
         
         # Check if label column exists
         label_col = None
-        possible_label_names = ['Label', 'label', 'y', 'target', 'class', 'malware']  # Added 'Label' (capital L)
+        possible_label_names = ['Label', 'label', 'y', 'target', 'class', 'malware']
         
         for col_name in possible_label_names:
             if col_name in df.columns:
@@ -68,8 +35,6 @@ def load_ember_parquet_incrementally(file_paths, chunk_size=50000):
         if label_col is None:
             print(f"  WARNING: No label column found in {file_path}")
             print(f"  Available columns: {list(df.columns)}")
-            # If no labels, assume this is training data and try to infer
-            # For now, we'll skip files without labels
             continue
             
         # Get features (all columns except label)
@@ -114,8 +79,8 @@ def load_ember_parquet_incrementally(file_paths, chunk_size=50000):
     
     return X, y
 
-def train_ember_model(train_files, model_output_path="nfs_full.pickle", quick_test=False):
-    """Train EMBER model on pre-processed features"""
+def train_ember_lightgbm(train_files, model_output_path="ember_model.txt", quick_test=False):
+    """Train EMBER model using LightGBM"""
     
     print("=== LOADING EMBER DATA ===")
     X, y = load_ember_parquet_incrementally(train_files)
@@ -128,51 +93,87 @@ def train_ember_model(train_files, model_output_path="nfs_full.pickle", quick_te
         y = y[indices]
         print(f"Reduced dataset: {X.shape[0]} samples")
     
-    print(f"\n=== TRAINING MODEL ===")
-    print(f"Dataset size: {X.shape[0]} samples, {X.shape[1]} features")
-    model = SimpleEMBERModel()
-    model.fit(X, y)
+    # Split for validation
+    print("\n=== SPLITTING DATA ===")
+    X_train, X_val, y_train, y_val = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+    print(f"Training set: {X_train.shape[0]} samples")
+    print(f"Validation set: {X_val.shape[0]} samples")
+    
+    print(f"\n=== TRAINING LIGHTGBM MODEL ===")
+    
+    # Create LightGBM datasets
+    train_data = lgb.Dataset(X_train, label=y_train)
+    val_data = lgb.Dataset(X_val, label=y_val, reference=train_data)
+    
+    # Parameters optimized for EMBER (from their paper)
+    params = {
+        'boosting_type': 'gbdt',
+        'objective': 'binary',
+        'metric': ['binary_logloss', 'binary_error'],
+        'num_leaves': 2048,
+        'learning_rate': 0.05,
+        'feature_fraction': 0.5,
+        'bagging_fraction': 1.0,
+        'bagging_freq': 0,
+        'verbose': 1,
+        'num_threads': -1
+    }
+    
+    # Train
+    print("Starting training...")
+    model = lgb.train(
+        params,
+        train_data,
+        num_boost_round=1000,
+        valid_sets=[train_data, val_data],
+        valid_names=['train', 'valid'],
+        callbacks=[
+            lgb.early_stopping(stopping_rounds=20),
+            lgb.log_evaluation(period=10)
+        ]
+    )
     
     print(f"\n=== SAVING MODEL ===")
-    with open(model_output_path, 'wb') as f:
-        pickle.dump(model, f)
-    
+    # Save as text file
+    model.save_model(model_output_path, num_iteration=model.best_iteration)
     print(f"Model saved to: {model_output_path}")
+    
+    # Compress it (required format for ember_model.py)
+    gz_path = model_output_path + '.gz'
+    with open(model_output_path, 'r') as f_in:
+        with gzip.open(gz_path, 'wb') as f_out:
+            f_out.write(f_in.read().encode('ascii'))
+    
+    print(f"Compressed model saved to: {gz_path}")
     print(f"Training complete!")
     
-    return model, X, y
+    return model, X_train, y_train, X_val, y_val
 
-def evaluate_model(model, X_test, y_test):
+def evaluate_model(model, X, y):
     """Evaluate model performance"""
-    print("\n=== EVALUATING MODEL ===")
+    y_pred_proba = model.predict(X)
     
-    y_pred = model.predict(X_test)
-    y_proba = model.predict_proba(X_test)[:, 1]  # Probability of malware
+    # Try different thresholds
+    thresholds = [0.5, 0.8336]  # 0.8336 is the default in ember_model.py
     
-    # Calculate metrics
-    acc = accuracy_score(y_test, y_pred)
-    rec = recall_score(y_test, y_pred)
-    pre = precision_score(y_test, y_pred)
-    f1s = f1_score(y_test, y_pred)
-    
-    print(f"Accuracy:  {acc:.4f}")
-    print(f"Recall:    {rec:.4f}")
-    print(f"Precision: {pre:.4f}")
-    print(f"F1 Score:  {f1s:.4f}")
-    
-    # Confusion matrix
-    tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
-    print(f"\nConfusion Matrix:")
-    print(f"True Negatives:  {tn}")
-    print(f"False Positives: {fp}")
-    print(f"False Negatives: {fn}")
-    print(f"True Positives:  {tp}")
-    
-    # Rates
-    fpr = fp/(fp+tn)
-    fnr = fn/(tp+fn)
-    print(f"\nFalse Positive Rate: {fpr:.4f}")
-    print(f"False Negative Rate: {fnr:.4f}")
+    for thresh in thresholds:
+        y_pred = (y_pred_proba >= thresh).astype(int)
+        
+        acc = accuracy_score(y, y_pred)
+        f1 = f1_score(y, y_pred)
+        recall = recall_score(y, y_pred)
+        precision = precision_score(y, y_pred)
+        
+        print(f"\nThreshold: {thresh}")
+        print(f"Accuracy:  {acc:.4f}")
+        print(f"F1 Score:  {f1:.4f}")
+        print(f"Recall:    {recall:.4f}")
+        print(f"Precision: {precision:.4f}")
+        
+        cm = confusion_matrix(y, y_pred)
+        print(f"Confusion Matrix:\n{cm}")
 
 # Configuration
 train_files = [
@@ -186,15 +187,19 @@ test_files = [
 ]
 
 if __name__ == '__main__':
-    print("=== EMBER PRE-PROCESSED FEATURES TRAINING ===")
-    print(f"Training files: {len(train_files)}")
+    print("=== EMBER LIGHTGBM TRAINING ===")
+    print(f"Training files: {train_files}")
     
     # Train model - set quick_test=True for faster training with smaller dataset
-    model, X_train, y_train = train_ember_model(
+    model, X_train, y_train, X_val, y_val = train_ember_lightgbm(
         train_files=train_files,
-        model_output_path="nfs_full.pickle",
+        model_output_path="../defender/defender/models/ember_model.txt",
         quick_test=True  # Change to False for full dataset training
     )
+    
+    # Evaluate on validation set
+    print("\n=== VALIDATION SET EVALUATION ===")
+    evaluate_model(model, X_val, y_val)
     
     # Optional: Load and evaluate on test data
     try:
@@ -202,6 +207,7 @@ if __name__ == '__main__':
         X_test, y_test = load_ember_parquet_incrementally(test_files)
         
         # Evaluate model
+        print("\n=== TEST SET EVALUATION ===")
         evaluate_model(model, X_test, y_test)
         
     except Exception as e:
@@ -209,4 +215,8 @@ if __name__ == '__main__':
         print("Model training completed successfully anyway!")
     
     print("\n=== TRAINING COMPLETE ===")
-    print("Your nfs_full.pickle model is ready!")
+    print("Your ember_model.txt.gz is ready!")
+    print("\nNext steps:")
+    print("1. Update Dockerfile: ENV DF_MODEL_NAME='ember'")
+    print("2. Rebuild Docker: docker build -t malware-defense .")
+    print("3. Run: docker run --memory=1g -p 8080:8080 malware-defense")
