@@ -31,3 +31,6 @@ curl -X GET http://localhost:8080/model
 
 
 curl -X POST --data-binary @10_modified.exe http://localhost:8080/ -H "Content-Type: application/octet-stream"
+
+ember_model.txt.gz is the defense model, runs using ember_model.py
+attack files delivered separately 
