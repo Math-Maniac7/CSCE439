@@ -1,0 +1,22 @@
+{
+  "models": [
+    {
+      "name": "Team1_Defender",
+      "url": "http://team1.example.com:8080/"
+    },
+    {
+      "name": "Team2_Defender",
+      "url": "http://team2.example.com:8080/"
+    },
+    {
+      "name": "Team3_Defender",
+      "url": "http://team3.example.com:8080/"
+    },
+    {
+      "name": "Local_Test",
+      "url": "http://localhost:8080/"
+    }
+  ],
+  "notes": "添加所有需要测试的team模型URL"
+}
+
