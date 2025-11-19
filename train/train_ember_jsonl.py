@@ -11,30 +11,84 @@ import pickle
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score, confusion_matrix
 import argparse
 import gc
 from tqdm import tqdm
+import os
+
+# 尝试导入GPU加速的库
+try:
+    import lightgbm as lgb
+    HAS_LIGHTGBM = True
+    print("✓ LightGBM available (GPU support enabled)")
+except ImportError:
+    HAS_LIGHTGBM = False
+    print("⚠ LightGBM not available, falling back to RandomForest")
+
+try:
+    from sklearn.ensemble import RandomForestClassifier
+    HAS_SKLEARN = True
+except ImportError:
+    HAS_SKLEARN = False
 
 
 class EMBERModel:
-    """基于EMBER特征的恶意软件检测模型"""
+    """基于EMBER特征的恶意软件检测模型（支持GPU加速）"""
     
     def __init__(self, 
-                 classifier=RandomForestClassifier(
-                     n_estimators=100,
-                     max_depth=30,
-                     max_features='sqrt',
-                     n_jobs=-1,
-                     random_state=42,
-                     verbose=1
-                 )):
-        self.classifier = classifier
+                 use_gpu=True,
+                 n_estimators=500,
+                 max_depth=30,
+                 random_state=42):
+        """
+        初始化模型
+        
+        Args:
+            use_gpu: 是否使用GPU加速（LightGBM）
+            n_estimators: 树的数量（GPU模式下可以更多）
+            max_depth: 树的最大深度
+            random_state: 随机种子
+        """
+        self.use_gpu = use_gpu and HAS_LIGHTGBM
         self.scaler = MinMaxScaler()
         self.feature_names = None
+        
+        # 根据可用资源选择分类器
+        if self.use_gpu:
+            # 使用LightGBM GPU加速
+            print("使用 LightGBM GPU 加速训练")
+            device = 'gpu' if os.environ.get('CUDA_VISIBLE_DEVICES') else 'cpu'
+            self.classifier = lgb.LGBMClassifier(
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                learning_rate=0.05,
+                num_leaves=31,
+                feature_fraction=0.8,
+                bagging_fraction=0.8,
+                bagging_freq=5,
+                device=device,
+                gpu_platform_id=0,
+                gpu_device_id=0,
+                random_state=random_state,
+                verbose=1,
+                n_jobs=-1  # 使用所有CPU核心
+            )
+        elif HAS_SKLEARN:
+            # 使用RandomForest（CPU，但可以使用所有核心）
+            print("使用 RandomForest (CPU, 多核)")
+            self.classifier = RandomForestClassifier(
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+                max_features='sqrt',
+                n_jobs=-1,  # 使用所有CPU核心
+                random_state=random_state,
+                verbose=1
+            )
+        else:
+            raise ImportError("需要安装 LightGBM 或 scikit-learn")
         
     def fit(self, X, y):
         """训练模型"""
@@ -44,22 +98,28 @@ class EMBERModel:
         print("正在训练分类器...")
         self.classifier.fit(X_scaled, y)
     
-    def fit_incremental(self, data_generator, max_memory_samples=500000):
+    def fit_incremental(self, data_generator, max_memory_samples=None):
         """
-        增量训练模型（分批加载数据，节省内存）
+        增量训练模型（分批加载数据，充分利用超算资源）
         
         Args:
             data_generator: 生成器函数，每次yield (X_batch, y_batch)
-            max_memory_samples: 内存中最多保留的样本数（默认50万，约11GB内存）
+            max_memory_samples: 内存中最多保留的样本数（None表示不限制，充分利用内存）
         """
-        print("=== 分批加载训练模式 ===")
+        if max_memory_samples is None:
+            # 超算模式：不限制内存，充分利用资源
+            max_memory_samples = 10_000_000  # 1000万样本（约190GB，超算可以承受）
+            print("=== 超算模式：充分利用内存和GPU ===")
+        else:
+            print("=== 分批加载训练模式 ===")
         print(f"内存限制: 最多同时加载 {max_memory_samples:,} 个样本")
         
-        # 第一步：计算scaler的统计信息（使用部分样本）
+        # 第一步：计算scaler的统计信息（超算模式下使用更多样本）
         print("\n步骤1/3: 计算特征缩放器统计信息...")
         all_X_for_scaler = []
         sample_count = 0
-        max_samples_for_scaler = min(100000, max_memory_samples // 5)  # 使用最多10万样本计算scaler
+        # 超算模式下使用更多样本计算scaler以获得更好的统计信息
+        max_samples_for_scaler = min(1_000_000, max_memory_samples // 2) if max_memory_samples else 1_000_000
         
         gen = data_generator()
         for X_batch, y_batch in gen:
@@ -843,12 +903,18 @@ def main():
                         help='训练/测试集分割比例')
     parser.add_argument('--random-state', type=int, default=42,
                         help='随机种子')
-    parser.add_argument('--batch-size', type=int, default=50000,
-                        help='分批加载时的批次大小（用于节省内存，默认50000）')
+    parser.add_argument('--batch-size', type=int, default=500000,
+                        help='分批加载时的批次大小（超算模式默认500000）')
     parser.add_argument('--use-batch', action='store_true',
-                        help='使用分批加载模式（节省内存，适合大数据集）')
+                        help='使用分批加载模式（超算模式下可处理超大数据集）')
     parser.add_argument('--sample-ratio', type=float, default=1.0,
-                        help='采样比例（0.0-1.0），用于快速训练，例如0.1表示使用10%%的数据')
+                        help='采样比例（0.0-1.0），1.0表示使用全部数据（超算模式推荐）')
+    parser.add_argument('--use-gpu', action='store_true', default=True,
+                        help='使用GPU加速（默认启用，需要LightGBM GPU支持）')
+    parser.add_argument('--n-estimators', type=int, default=500,
+                        help='树的数量（GPU模式下可以更多，默认500）')
+    parser.add_argument('--no-memory-limit', action='store_true',
+                        help='不限制内存使用（超算模式，充分利用资源）')
     
     args = parser.parse_args()
     
@@ -883,8 +949,14 @@ def main():
                     yield X_batch, y_batch
         
         # 使用增量训练
-        model = EMBERModel()
-        max_memory = int(args.batch_size * 10)  # 批次大小的10倍作为内存限制
+        model = EMBERModel(
+            use_gpu=args.use_gpu,
+            n_estimators=args.n_estimators,
+            max_depth=30,
+            random_state=args.random_state
+        )
+        # 超算模式：不限制内存或使用更大的内存限制
+        max_memory = None if args.no_memory_limit else int(args.batch_size * 20)
         model.fit_incremental(train_data_generator, max_memory_samples=max_memory)
         
         # 保存模型
@@ -899,13 +971,18 @@ def main():
         print("如需评估，请使用标准模式加载测试数据")
         return
     
-    # 标准模式：一次性加载（如果数据量大可能内存不足）
+    # 标准模式：一次性加载（超算模式下可以加载全部数据）
     if args.sample_ratio < 1.0:
         print(f"使用采样模式（采样比例: {args.sample_ratio*100:.1f}%）")
+    else:
+        print("超算模式：加载全部数据（不限制内存）")
+    
+    # 超算模式下，如果指定了--no-memory-limit，移除max_samples限制
+    max_samples = None if args.no_memory_limit else args.max_samples
     
     X_train, y_train = load_multiple_jsonl_files(
         train_files, 
-        max_samples_per_file=args.max_samples
+        max_samples_per_file=max_samples
     )
     
     # 如果指定了采样比例，进行采样
@@ -950,7 +1027,13 @@ def main():
     
     # 训练模型
     print("\n=== 训练模型 ===")
-    model = EMBERModel()
+    print(f"训练集大小: {X_train.shape[0]:,} 个样本, {X_train.shape[1]} 个特征")
+    model = EMBERModel(
+        use_gpu=args.use_gpu,
+        n_estimators=args.n_estimators,
+        max_depth=30,
+        random_state=args.random_state
+    )
     model.fit(X_train, y_train)
     
     # 评估模型

@@ -5,12 +5,13 @@ from defender.apps import create_app
 
 # Import available models
 try:
-    from defender.models.nfs_model import PEAttributeExtractor, NFSModel, NeedForSpeedModel
-    HAS_NFS_MODEL = True
+    from defender.models.ember_jsonl_model import EMBERJSONLModel
+    HAS_EMBER_JSONL_MODEL = True
 except ImportError as e:
-    print(f"Warning: Could not import NFS models: {e}")
-    HAS_NFS_MODEL = False
+    print(f"Warning: Could not import EMBERJSONLModel: {e}")
+    HAS_EMBER_JSONL_MODEL = False
 
+# Fallback dummy model
 try:
     from defender.models.dummy_model import DummyModel
     HAS_DUMMY_MODEL = True
@@ -18,28 +19,11 @@ except ImportError as e:
     print(f"Warning: Could not import DummyModel: {e}")
     HAS_DUMMY_MODEL = False
 
-# Try to import other models if they exist
-try:
-    from defender.models.nfs_behemot_model import NFSBehemotModel
-    HAS_BEHEMOT_MODEL = True
-except ImportError:
-    HAS_BEHEMOT_MODEL = False
-
-# Try to import EMBER JSONL model
-try:
-    from defender.models.ember_jsonl_model import EMBERJSONLModel
-    HAS_EMBER_JSONL_MODEL = True
-except ImportError as e:
-    print(f"Warning: Could not import EMBERJSONLModel: {e}")
-    HAS_EMBER_JSONL_MODEL = False
-
 if __name__ == "__main__":
     # Retrieve config values from environment variables
-    model_gz_path = envparse.env("DF_MODEL_GZ_PATH", cast=str, default="models/nfs_full.pickle")
-    model_thresh = envparse.env("DF_MODEL_THRESH", cast=float, default=0.8336)
-    model_name = envparse.env("DF_MODEL_NAME", cast=str, default="nfs")
-    model_ball_thresh = envparse.env("DF_MODEL_BALL_THRESH", cast=float, default=0.25)
-    model_max_history = envparse.env("DF_MODEL_HISTORY", cast=int, default=10_000)
+    model_gz_path = envparse.env("DF_MODEL_GZ_PATH", cast=str, default="models/ember_jsonl_model.pickle")
+    model_thresh = envparse.env("DF_MODEL_THRESH", cast=float, default=0.5)
+    model_name = envparse.env("DF_MODEL_NAME", cast=str, default="ember_jsonl")
 
     # Construct absolute path to ensure the correct model is loaded
     if not model_gz_path.startswith(os.sep):
@@ -52,27 +36,7 @@ if __name__ == "__main__":
     model = None
 
     # Try to load the specified model based on model_name
-    if model_name.lower() == "nfs" and HAS_NFS_MODEL:
-        try:
-            if os.path.exists(model_gz_path):
-                print(f"Loading NFSModel from {model_gz_path}")
-                with open(model_gz_path, "rb") as f:
-                    model = NFSModel(f)
-                print("NFSModel loaded successfully")
-            else:
-                print(f"Model file not found: {model_gz_path}")
-        except Exception as e:
-            print(f"Error loading NFSModel: {e}")
-    
-    elif model_name.lower() == "behemot" and HAS_BEHEMOT_MODEL:
-        try:
-            print("Loading NFSBehemotModel")
-            model = NFSBehemotModel()
-            print("NFSBehemotModel loaded successfully")
-        except Exception as e:
-            print(f"Error loading NFSBehemotModel: {e}")
-    
-    elif model_name.lower() == "ember_jsonl" and HAS_EMBER_JSONL_MODEL:
+    if model_name.lower() == "ember_jsonl" and HAS_EMBER_JSONL_MODEL:
         try:
             if os.path.exists(model_gz_path):
                 print(f"Loading EMBERJSONLModel from {model_gz_path}")
