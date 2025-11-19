@@ -1,4 +1,5 @@
 # pip install git+https://github.com/endgameinc/ember.git
+# Note: ember must be installed separately: pip install git+https://github.com/endgameinc/ember.git
 flask==2.2.5
 gevent==22.10.2
 envparse==0.2.0

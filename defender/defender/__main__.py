@@ -25,6 +25,14 @@ try:
 except ImportError:
     HAS_BEHEMOT_MODEL = False
 
+# Try to import EMBER JSONL model
+try:
+    from defender.models.ember_jsonl_model import EMBERJSONLModel
+    HAS_EMBER_JSONL_MODEL = True
+except ImportError as e:
+    print(f"Warning: Could not import EMBERJSONLModel: {e}")
+    HAS_EMBER_JSONL_MODEL = False
+
 if __name__ == "__main__":
     # Retrieve config values from environment variables
     model_gz_path = envparse.env("DF_MODEL_GZ_PATH", cast=str, default="models/nfs_full.pickle")
@@ -63,6 +71,17 @@ if __name__ == "__main__":
             print("NFSBehemotModel loaded successfully")
         except Exception as e:
             print(f"Error loading NFSBehemotModel: {e}")
+    
+    elif model_name.lower() == "ember_jsonl" and HAS_EMBER_JSONL_MODEL:
+        try:
+            if os.path.exists(model_gz_path):
+                print(f"Loading EMBERJSONLModel from {model_gz_path}")
+                model = EMBERJSONLModel(model_path=model_gz_path, threshold=model_thresh)
+                print("EMBERJSONLModel loaded successfully")
+            else:
+                print(f"Model file not found: {model_gz_path}")
+        except Exception as e:
+            print(f"Error loading EMBERJSONLModel: {e}")
 
     # Fallback to dummy model if main model fails
     if model is None:
