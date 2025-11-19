@@ -56,7 +56,7 @@ USER defender
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH="/opt/defender"
 ENV DF_MODEL_NAME="ember"
-ENV DF_MODEL_THRESH=0.8336
+ENV DF_MODEL_THRESH=0.7
 
 # Expose port
 EXPOSE 8080
