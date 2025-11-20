@@ -19,8 +19,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from model_definitions import get_all_model_ids
 
 
-def train_and_test_model(model_id, train_dir, test_dir, challenge_dir, 
-                         output_dir, iterations, max_samples, sample_ratio, use_gpu):
+def train_and_test_model(model_id, dataset_dirs, challenge_dir, 
+                         output_dir, iterations, max_samples, sample_ratio, use_gpu, test_split=0.2):
     """训练单个模型并测试"""
     print(f"\n{'#'*80}")
     print(f"# 训练和测试模型: {model_id}")
@@ -32,12 +32,15 @@ def train_and_test_model(model_id, train_dir, test_dir, challenge_dir,
         sys.executable, 
         str(Path(__file__).parent / 'train_iterative.py'),
         '--model-id', model_id,
-        '--train-dir', train_dir,
-        '--test-dir', test_dir,
         '--output-dir', str(Path(output_dir) / model_id),
         '--iterations', str(iterations),
         '--sample-ratio', str(sample_ratio),
+        '--test-split', str(test_split),
     ]
+    
+    # 添加所有数据集目录
+    for dataset_dir in dataset_dirs:
+        train_cmd.extend(['--dataset-dir', dataset_dir])
     
     if max_samples:
         train_cmd.extend(['--max-samples', str(max_samples)])
@@ -189,12 +192,12 @@ def compare_models(all_results, output_dir):
 
 def main():
     parser = argparse.ArgumentParser(description='训练所有5个防御模型并选择最佳模型')
-    parser.add_argument('--train-dir', type=str, required=True,
-                       help='训练数据目录（EMBER数据集）')
-    parser.add_argument('--test-dir', type=str, required=True,
-                       help='测试数据目录（EMBER数据集）')
+    parser.add_argument('--dataset-dir', type=str, action='append', required=True,
+                       help='EMBER数据集目录（可指定多个，例如：--dataset-dir dir1 --dataset-dir dir2）')
     parser.add_argument('--challenge-dir', type=str, required=True,
-                       help='Challenge测试数据集目录')
+                       help='Challenge验证数据集目录')
+    parser.add_argument('--test-split', type=float, default=0.2,
+                       help='测试集比例（默认0.2，即20%），剩余80%作为训练集')
     parser.add_argument('--output-dir', type=str, default='trained_models',
                        help='模型输出目录')
     parser.add_argument('--iterations', type=int, default=5,
@@ -223,6 +226,8 @@ def main():
         model_ids = [m for m in args.models if m != 'all']
     
     print(f"将训练以下模型: {model_ids}")
+    print(f"数据集目录: {args.dataset_dir}")
+    print(f"数据切分: {int((1-args.test_split)*100)}% 训练集, {int(args.test_split*100)}% 测试集")
     print(f"GPU使用: {'是' if use_gpu else '否'}")
     print(f"迭代次数: {args.iterations}")
     print(f"输出目录: {args.output_dir}")
@@ -238,14 +243,14 @@ def main():
         try:
             results = train_and_test_model(
                 model_id=model_id,
-                train_dir=args.train_dir,
-                test_dir=args.test_dir,
+                dataset_dirs=args.dataset_dir,
                 challenge_dir=args.challenge_dir,
                 output_dir=str(output_dir),
                 iterations=args.iterations,
                 max_samples=args.max_samples,
                 sample_ratio=args.sample_ratio,
-                use_gpu=use_gpu
+                use_gpu=use_gpu,
+                test_split=args.test_split
             )
             all_results[model_id] = results
         except Exception as e:

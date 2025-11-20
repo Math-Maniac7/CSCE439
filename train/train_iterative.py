@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from model_definitions import create_model, get_all_model_ids
-from train_ember_jsonl import load_ember_jsonl
+from load_datasets import load_all_ember_datasets
 
 from sklearn.metrics import (
     accuracy_score, f1_score, recall_score, precision_score, 
@@ -65,29 +65,29 @@ def evaluate_model(model, X_test, y_test):
     }
 
 
-def train_single_iteration(model, train_dir, test_dir, iteration, max_samples=None, sample_ratio=1.0):
+def train_single_iteration(model, dataset_dirs, iteration, max_samples=None, sample_ratio=1.0, test_split=0.2):
     """训练单次迭代"""
     print(f"\n{'='*60}")
     print(f"迭代 {iteration} - 模型 {model.model_id}")
     print(f"{'='*60}")
     
-    # 加载训练数据
-    print("加载训练数据...")
-    X_train, y_train = load_ember_jsonl(
-        train_dir, 
-        max_samples=max_samples, 
-        sample_ratio=sample_ratio
+    # 加载所有数据集并自动切分
+    print("加载所有数据集并切分...")
+    X_train, X_test, y_train, y_test = load_all_ember_datasets(
+        dataset_dirs=dataset_dirs,
+        max_samples_per_file=max_samples,
+        test_split=test_split,
+        random_state=42 + iteration  # 每次迭代使用不同的随机种子
     )
-    print(f"训练集: {len(X_train)} 个样本")
     
-    # 加载测试数据
-    print("加载测试数据...")
-    X_test, y_test = load_ember_jsonl(
-        test_dir,
-        max_samples=max_samples,
-        sample_ratio=sample_ratio
-    )
-    print(f"测试集: {len(X_test)} 个样本")
+    # 如果指定了采样比例，对训练集进行采样
+    if sample_ratio < 1.0:
+        import numpy as np
+        sample_size = int(len(X_train) * sample_ratio)
+        indices = np.random.choice(len(X_train), size=sample_size, replace=False)
+        X_train = X_train[indices]
+        y_train = y_train[indices]
+        print(f"采样后训练集: {len(X_train)} 个样本")
     
     # 训练模型
     print("开始训练...")
@@ -119,10 +119,8 @@ def main():
     parser.add_argument('--model-id', type=str, required=True,
                        choices=['model1', 'model2', 'model3', 'model4', 'model5'],
                        help='模型ID')
-    parser.add_argument('--train-dir', type=str, required=True,
-                       help='训练数据目录')
-    parser.add_argument('--test-dir', type=str, required=True,
-                       help='测试数据目录')
+    parser.add_argument('--dataset-dir', type=str, action='append', required=True,
+                       help='EMBER数据集目录（可指定多个，例如：--dataset-dir dir1 --dataset-dir dir2）')
     parser.add_argument('--output-dir', type=str, default='models',
                        help='模型输出目录')
     parser.add_argument('--iterations', type=int, default=5,
@@ -130,7 +128,9 @@ def main():
     parser.add_argument('--max-samples', type=int, default=None,
                        help='每个文件最大样本数')
     parser.add_argument('--sample-ratio', type=float, default=1.0,
-                       help='采样比例')
+                       help='采样比例（对训练集的采样，不影响测试集）')
+    parser.add_argument('--test-split', type=float, default=0.2,
+                       help='测试集比例（默认0.2，即20%），剩余80%作为训练集')
     parser.add_argument('--use-gpu', action='store_true', default=True,
                        help='使用GPU训练')
     parser.add_argument('--no-gpu', action='store_true',
@@ -163,11 +163,11 @@ def main():
         try:
             metrics = train_single_iteration(
                 model, 
-                args.train_dir, 
-                args.test_dir,
+                args.dataset_dir,
                 iteration,
                 max_samples=args.max_samples,
-                sample_ratio=args.sample_ratio
+                sample_ratio=args.sample_ratio,
+                test_split=args.test_split
             )
         except Exception as e:
             print(f"迭代 {iteration} 训练失败: {e}")

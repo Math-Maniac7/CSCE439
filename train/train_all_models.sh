@@ -5,24 +5,31 @@
 set -e  # 遇到错误立即退出
 
 # ==================== 配置区域 ====================
-# 数据集路径（请根据实际情况修改）
-EMBER_TRAIN_DIR="/path/to/ember2018"  # EMBER训练数据目录
-EMBER_TEST_DIR="/path/to/ember2018"   # EMBER测试数据目录
-CHALLENGE_DIR="/path/to/challenge"    # Challenge测试数据集目录
+# 数据集路径（HPRC FASTER系统）
+DATASET_BASE="/scratch/user/yafeili/704/dataset"  # 数据集基础目录
+
+# 三个EMBER数据集目录（解压后的目录）
+EMBER_DATASET_2017_2="$DATASET_BASE/ember_2017_2"      # EMBER 2017_2数据集目录
+EMBER_DATASET_2018_2="$DATASET_BASE/ember2018"         # EMBER 2018数据集目录
+EMBER_DATASET="$DATASET_BASE/ember"                     # EMBER数据集目录（通用）
+
+# Challenge验证集目录
+CHALLENGE_DIR="$DATASET_BASE/challenge_ds"              # Challenge测试数据集目录
 
 # 训练参数
 ITERATIONS=5          # 每个模型的迭代次数
 SAMPLE_RATIO=1.0      # 采样比例（1.0表示使用全部数据）
 MAX_SAMPLES=""        # 每个文件最大样本数（空表示不限制）
 
-# 输出目录
-OUTPUT_DIR="trained_models_$(date +%Y%m%d_%H%M%S)"
+# 输出目录（HPRC FASTER系统）
+OUTPUT_BASE="/scratch/user/yafeili/704/defenceOutput"
+OUTPUT_DIR="$OUTPUT_BASE/trained_models_$(date +%Y%m%d_%H%M%S)"
 
 # GPU设置
 USE_GPU=true          # 是否使用GPU
 
-# 日志文件
-LOG_FILE="nohup_train_$(date +%Y%m%d_%H%M%S).out"
+# 日志文件（保存到输出目录）
+LOG_FILE="$OUTPUT_BASE/nohup_train_$(date +%Y%m%d_%H%M%S).out"
 # ================================================
 
 # 颜色输出
@@ -37,15 +44,22 @@ echo -e "${GREEN}========================================${NC}"
 echo ""
 
 # 检查参数
-if [ ! -d "$EMBER_TRAIN_DIR" ]; then
-    echo -e "${RED}错误: 训练数据目录不存在: $EMBER_TRAIN_DIR${NC}"
-    echo "请修改脚本中的 EMBER_TRAIN_DIR 变量"
-    exit 1
+if [ ! -d "$EMBER_DATASET_2017_2" ]; then
+    echo -e "${YELLOW}警告: EMBER 2017_2数据集目录不存在: $EMBER_DATASET_2017_2${NC}"
 fi
 
-if [ ! -d "$EMBER_TEST_DIR" ]; then
-    echo -e "${RED}错误: 测试数据目录不存在: $EMBER_TEST_DIR${NC}"
-    echo "请修改脚本中的 EMBER_TEST_DIR 变量"
+if [ ! -d "$EMBER_DATASET_2018_2" ]; then
+    echo -e "${YELLOW}警告: EMBER 2018_2数据集目录不存在: $EMBER_DATASET_2018_2${NC}"
+fi
+
+if [ ! -d "$EMBER_DATASET" ]; then
+    echo -e "${YELLOW}警告: EMBER数据集目录不存在: $EMBER_DATASET${NC}"
+fi
+
+# 至少需要一个数据集目录
+if [ ! -d "$EMBER_DATASET_2017_2" ] && [ ! -d "$EMBER_DATASET_2018_2" ] && [ ! -d "$EMBER_DATASET" ]; then
+    echo -e "${RED}错误: 至少需要一个EMBER数据集目录${NC}"
+    echo "请修改脚本中的数据集路径变量"
     exit 1
 fi
 
@@ -71,13 +85,25 @@ fi
 
 # 创建输出目录
 mkdir -p "$OUTPUT_DIR"
+mkdir -p "$OUTPUT_BASE"  # 确保基础目录存在
+echo "数据集基础目录: $DATASET_BASE"
+echo "输出基础目录: $OUTPUT_BASE"
 echo "输出目录: $OUTPUT_DIR"
 
 # 构建训练命令
 TRAIN_CMD="python3 train/train_all_models.py"
-TRAIN_CMD="$TRAIN_CMD --train-dir \"$EMBER_TRAIN_DIR\""
-TRAIN_CMD="$TRAIN_CMD --test-dir \"$EMBER_TEST_DIR\""
 TRAIN_CMD="$TRAIN_CMD --challenge-dir \"$CHALLENGE_DIR\""
+
+# 添加数据集目录（只添加存在的目录）
+if [ -d "$EMBER_DATASET_2017_2" ]; then
+    TRAIN_CMD="$TRAIN_CMD --dataset-dir \"$EMBER_DATASET_2017_2\""
+fi
+if [ -d "$EMBER_DATASET_2018_2" ]; then
+    TRAIN_CMD="$TRAIN_CMD --dataset-dir \"$EMBER_DATASET_2018_2\""
+fi
+if [ -d "$EMBER_DATASET" ]; then
+    TRAIN_CMD="$TRAIN_CMD --dataset-dir \"$EMBER_DATASET\""
+fi
 TRAIN_CMD="$TRAIN_CMD --output-dir \"$OUTPUT_DIR\""
 TRAIN_CMD="$TRAIN_CMD --iterations $ITERATIONS"
 TRAIN_CMD="$TRAIN_CMD --sample-ratio $SAMPLE_RATIO"
@@ -95,9 +121,15 @@ fi
 # 显示配置信息
 echo ""
 echo -e "${GREEN}训练配置:${NC}"
-echo "  训练数据: $EMBER_TRAIN_DIR"
-echo "  测试数据: $EMBER_TEST_DIR"
-echo "  Challenge数据: $CHALLENGE_DIR"
+echo "  数据集基础目录: $DATASET_BASE"
+echo "  EMBER数据集目录:"
+[ -d "$EMBER_DATASET_2017_2" ] && echo "    ✓ $EMBER_DATASET_2017_2" || echo "    ✗ $EMBER_DATASET_2017_2 (不存在)"
+[ -d "$EMBER_DATASET_2018_2" ] && echo "    ✓ $EMBER_DATASET_2018_2" || echo "    ✗ $EMBER_DATASET_2018_2 (不存在)"
+[ -d "$EMBER_DATASET" ] && echo "    ✓ $EMBER_DATASET" || echo "    ✗ $EMBER_DATASET (不存在)"
+echo "  Challenge验证集: $CHALLENGE_DIR"
+[ -d "$CHALLENGE_DIR" ] && echo "    ✓ Challenge目录存在" || echo "    ✗ Challenge目录不存在"
+echo "  数据切分: 80% 训练集, 20% 测试集"
+echo "  输出目录: $OUTPUT_DIR"
 echo "  输出目录: $OUTPUT_DIR"
 echo "  迭代次数: $ITERATIONS"
 echo "  采样比例: $SAMPLE_RATIO"
