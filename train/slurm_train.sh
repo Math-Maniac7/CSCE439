@@ -42,15 +42,30 @@ export OMP_NUM_THREADS=32
 export MKL_NUM_THREADS=32
 export NUMEXPR_NUM_THREADS=32
 
-# 激活虚拟环境
+# 激活虚拟环境（尝试多个可能的位置）
+VENV_ACTIVATED=0
+
 if [ -f ~/venv/bin/activate ]; then
     source ~/venv/bin/activate
     echo "Activated virtual environment: ~/venv"
+    VENV_ACTIVATED=1
 elif [ -f $SCRATCH/venv/bin/activate ]; then
     source $SCRATCH/venv/bin/activate
     echo "Activated virtual environment: $SCRATCH/venv"
-else
+    VENV_ACTIVATED=1
+elif [ -f "/scratch/user/yafeili/venv/bin/activate" ]; then
+    source /scratch/user/yafeili/venv/bin/activate
+    echo "Activated virtual environment: /scratch/user/yafeili/venv"
+    VENV_ACTIVATED=1
+fi
+
+if [ $VENV_ACTIVATED -eq 0 ]; then
     echo "Warning: Virtual environment not found, using system Python"
+    echo "建议：创建虚拟环境以确保所有依赖已安装"
+    echo "      python3 -m venv ~/venv"
+    echo "      source ~/venv/bin/activate"
+    echo "      pip install numpy pandas scikit-learn tqdm lightgbm pefile lief requests"
+    echo "      pip install git+https://github.com/endgameinc/ember.git"
 fi
 
 # 验证Python和GPU
@@ -61,15 +76,39 @@ echo ""
 echo "GPU status:"
 nvidia-smi
 
-# 进入项目目录
-cd /scratch/user/yafeili/704/CSCE439
+# 进入项目目录（尝试多个可能的路径）
+if [ -d "/scratch/user/yafeili/CSCE439" ]; then
+    cd /scratch/user/yafeili/CSCE439
+elif [ -d "/scratch/user/yafeili/704/CSCE439" ]; then
+    cd /scratch/user/yafeili/704/CSCE439
+elif [ -d "$SCRATCH/CSCE439" ]; then
+    cd $SCRATCH/CSCE439
+else
+    echo "错误: 找不到项目目录"
+    echo "尝试查找CSCE439目录..."
+    find $SCRATCH -name "CSCE439" -type d 2>/dev/null | head -1 | xargs cd
+    if [ $? -ne 0 ]; then
+        echo "错误: 无法找到项目目录，请检查路径"
+        exit 1
+    fi
+fi
+
 echo ""
 echo "Working directory: $(pwd)"
 echo ""
 
-# 检查数据集目录
+# 检查数据集目录（尝试多个可能的路径）
 echo "Checking dataset directories..."
-DATASET_BASE="/scratch/user/yafeili/704/dataset"
+if [ -d "/scratch/user/yafeili/704/dataset" ]; then
+    DATASET_BASE="/scratch/user/yafeili/704/dataset"
+elif [ -d "/scratch/user/yafeili/dataset" ]; then
+    DATASET_BASE="/scratch/user/yafeili/dataset"
+else
+    echo "警告: 找不到数据集基础目录"
+    DATASET_BASE="/scratch/user/yafeili/704/dataset"
+fi
+
+echo "Dataset base directory: $DATASET_BASE"
 [ -d "$DATASET_BASE/ember_2017_2" ] && echo "✓ ember_2017_2 exists" || echo "✗ ember_2017_2 not found"
 [ -d "$DATASET_BASE/ember2018" ] && echo "✓ ember2018 exists" || echo "✗ ember2018 not found"
 [ -d "$DATASET_BASE/ember" ] && echo "✓ ember exists" || echo "✗ ember not found"
