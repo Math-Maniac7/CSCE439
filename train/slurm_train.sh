@@ -83,20 +83,22 @@ echo ""
 echo "GPU status:"
 nvidia-smi
 
-# 进入项目目录（根据实际路径）
+# 进入项目目录（已确认路径）
 PROJECT_DIR="/scratch/user/yafeili/CSCE439"
 if [ -d "$PROJECT_DIR" ]; then
     cd "$PROJECT_DIR"
-    echo "进入项目目录: $PROJECT_DIR"
+    echo "✓ 进入项目目录: $PROJECT_DIR"
 else
     echo "错误: 项目目录不存在: $PROJECT_DIR"
     echo "尝试查找CSCE439目录..."
     FOUND_DIR=$(find $SCRATCH -name "CSCE439" -type d 2>/dev/null | head -1)
     if [ -n "$FOUND_DIR" ] && [ -d "$FOUND_DIR" ]; then
         cd "$FOUND_DIR"
-        echo "找到项目目录: $FOUND_DIR"
+        echo "✓ 找到项目目录: $FOUND_DIR"
     else
         echo "错误: 无法找到项目目录，请检查路径"
+        echo "请确认项目目录位置:"
+        echo "  ls -la /scratch/user/yafeili/ | grep CSCE"
         exit 1
     fi
 fi
@@ -105,20 +107,14 @@ echo ""
 echo "Working directory: $(pwd)"
 echo ""
 
-# 检查数据集目录（根据实际路径）
+# 检查数据集目录（已确认路径）
 echo "Checking dataset directories..."
 DATASET_BASE="/scratch/user/yafeili/704/dataset"
 if [ ! -d "$DATASET_BASE" ]; then
-    echo "警告: 数据集基础目录不存在: $DATASET_BASE"
-    echo "尝试查找dataset目录..."
-    FOUND_DATASET=$(find $SCRATCH -name "dataset" -type d 2>/dev/null | head -1)
-    if [ -n "$FOUND_DATASET" ] && [ -d "$FOUND_DATASET" ]; then
-        DATASET_BASE="$FOUND_DATASET"
-        echo "找到数据集目录: $DATASET_BASE"
-    else
-        echo "错误: 无法找到数据集目录"
-        exit 1
-    fi
+    echo "错误: 数据集基础目录不存在: $DATASET_BASE"
+    echo "当前目录结构："
+    ls -la /scratch/user/yafeili/704/ 2>/dev/null || ls -la /scratch/user/yafeili/ | head -10
+    exit 1
 fi
 
 echo "Dataset base directory: $DATASET_BASE"
@@ -126,6 +122,23 @@ echo "Dataset base directory: $DATASET_BASE"
 [ -d "$DATASET_BASE/ember2018" ] && echo "✓ ember2018 exists" || echo "✗ ember2018 not found"
 [ -d "$DATASET_BASE/ember" ] && echo "✓ ember exists" || echo "✗ ember not found"
 [ -d "$DATASET_BASE/challenge_ds" ] && echo "✓ challenge_ds exists" || echo "✗ challenge_ds not found"
+
+# 检查JSONL文件
+echo ""
+echo "Checking JSONL files..."
+EMBER_JSONL_COUNT=$(find "$DATASET_BASE/ember2018" -name "train_features_*.jsonl" -type f 2>/dev/null | wc -l | tr -d ' ')
+if [ "$EMBER_JSONL_COUNT" -gt 0 ]; then
+    echo "✓ ember2018: $EMBER_JSONL_COUNT JSONL files found"
+else
+    echo "⚠ ember2018: No JSONL files found"
+fi
+
+EMBER_2017_JSONL_COUNT=$(find "$DATASET_BASE/ember_2017_2" -name "train_features_*.jsonl" -type f 2>/dev/null | wc -l | tr -d ' ')
+if [ "$EMBER_2017_JSONL_COUNT" -gt 0 ]; then
+    echo "✓ ember_2017_2: $EMBER_2017_JSONL_COUNT JSONL files found"
+else
+    echo "⚠ ember_2017_2: No JSONL files found"
+fi
 echo ""
 
 # 运行训练（非交互式，自动确认）

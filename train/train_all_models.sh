@@ -5,7 +5,7 @@
 set -e  # 遇到错误立即退出
 
 # ==================== 配置区域 ====================
-# 数据集路径（HPRC FASTER系统）
+# 数据集路径（HPRC FASTER系统 - 已确认路径）
 DATASET_BASE="/scratch/user/yafeili/704/dataset"  # 数据集基础目录
 
 # 三个EMBER数据集目录（解压后的目录）
