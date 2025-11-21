@@ -147,8 +147,8 @@ echo "Starting training..."
 echo "=========================================="
 echo ""
 
-# 使用echo "y"自动确认，避免交互式提示
-echo "y" | bash train/train_all_models.sh
+# 直接运行训练脚本（无需交互式确认）
+bash train/train_all_models.sh
 
 # 检查训练结果
 TRAIN_EXIT_CODE=$?

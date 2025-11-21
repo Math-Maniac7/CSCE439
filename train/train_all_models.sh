@@ -138,23 +138,11 @@ echo "  使用GPU: $USE_GPU"
 echo "  日志文件: $LOG_FILE"
 echo ""
 
-# 询问确认（非交互式模式下自动确认）
-if [ -t 0 ] && [ -z "$SLURM_JOB_ID" ]; then
-    # 交互式模式：询问确认
-    read -p "确认开始训练? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "已取消"
-        exit 0
-    fi
-else
-    # 非交互式模式（SLURM作业）：自动确认
-    echo "非交互式模式：自动确认开始训练"
-fi
-
-# 开始训练（使用nohup在后台运行，输出到日志文件）
+# 直接开始训练（无需交互式确认）
 echo ""
 echo -e "${GREEN}开始训练...${NC}"
+
+# 日志信息
 echo "日志将实时输出到: $LOG_FILE"
 echo "可以使用以下命令查看实时日志:"
 echo "  tail -f $LOG_FILE"
