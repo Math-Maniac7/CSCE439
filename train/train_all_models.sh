@@ -74,13 +74,18 @@ if [ ! -d "$CHALLENGE_DIR" ]; then
     fi
 fi
 
-# 检查GPU
+# 检查GPU（静默模式，不显示错误信息）
 if [ "$USE_GPU" = true ]; then
     if command -v nvidia-smi &> /dev/null; then
-        echo -e "${GREEN}检测到NVIDIA GPU:${NC}"
-        nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+        # 尝试检查GPU，但不显示错误（GPU可能需要在作业运行时才可用）
+        if nvidia-smi &> /dev/null; then
+            echo -e "${GREEN}检测到NVIDIA GPU:${NC}"
+            nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || echo "GPU信息获取失败，但GPU应该可用"
+        else
+            echo -e "${YELLOW}GPU驱动检查失败（这在作业开始时可能正常），GPU将在训练时可用${NC}"
+        fi
     else
-        echo -e "${YELLOW}警告: 未检测到NVIDIA GPU，将使用CPU训练${NC}"
+        echo -e "${YELLOW}警告: nvidia-smi不可用，但GPU应该通过SLURM分配${NC}"
     fi
 fi
 

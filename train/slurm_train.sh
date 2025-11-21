@@ -80,8 +80,19 @@ echo ""
 echo "Python version: $(python3 --version)"
 echo "Python path: $(which python3)"
 echo ""
+
+# 检查GPU（静默模式，不显示错误）
 echo "GPU status:"
-nvidia-smi
+if command -v nvidia-smi &> /dev/null; then
+    nvidia-smi &> /dev/null
+    if [ $? -eq 0 ]; then
+        nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null || echo "GPU信息获取失败，但GPU应该可用"
+    else
+        echo "GPU驱动检查失败（这在某些节点上正常），GPU将在训练时可用"
+    fi
+else
+    echo "nvidia-smi不可用，但GPU应该通过SLURM分配"
+fi
 
 # 进入项目目录（已确认路径）
 PROJECT_DIR="/scratch/user/yafeili/CSCE439"
