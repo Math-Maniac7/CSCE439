@@ -10,7 +10,7 @@
 # ---- GPU 分区 + GPU 强制要求 ----
 #SBATCH --partition=gpu          # GPU分区
 #SBATCH --gres=gpu:1             # 1块GPU
-#SBATCH --constraint=gpu         # 强制使用GPU节点（防止fallback到CPU）
+# 注意：FASTER集群可能不支持--constraint=gpu，仅使用partition和gres即可
 
 # ---- 保守资源请求，确保GPU节点能够满足 ----
 #SBATCH --nodes=1                # 使用1个节点
