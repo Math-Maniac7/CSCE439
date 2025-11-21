@@ -16,9 +16,17 @@ echo "=========================================="
 echo ""
 
 # ==================== 配置区域 ====================
-# 请根据本地实际情况修改这些路径
-DATASET_BASE="/Users/felix/Documents/704/dataset"  # 修改为你的本地路径
-PROJECT_DIR="/Users/felix/Documents/704/code/CSCE439"  # 修改为你的项目路径
+# HPRC FASTER系统路径（自动检测或手动设置）
+# 自动检测当前目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# HPRC数据集路径
+DATASET_BASE="/scratch/user/yafeili/704/dataset"
+
+# 如果自动检测失败，可以手动设置：
+# PROJECT_DIR="/scratch/user/yafeili/CSCE439"
+# DATASET_BASE="/scratch/user/yafeili/704/dataset"
 # ================================================
 
 ERRORS=0
@@ -131,7 +139,7 @@ echo ""
 
 # 检查5: 输出目录权限
 echo -e "${BLUE}[5/8] 检查输出目录权限...${NC}"
-OUTPUT_DIR="$PROJECT_DIR/test_output"
+OUTPUT_DIR="/scratch/user/yafeili/704/defenceOutput/test_output"
 if [ -d "$OUTPUT_DIR" ]; then
     if [ -w "$OUTPUT_DIR" ]; then
         echo -e "${GREEN}✓ 输出目录可写: $OUTPUT_DIR${NC}"
