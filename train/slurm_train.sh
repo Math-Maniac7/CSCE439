@@ -5,13 +5,18 @@
 #SBATCH --job-name=defence_training
 #SBATCH --output=/scratch/user/yafeili/704/defenceOutput/slurm_training_%j.out
 #SBATCH --error=/scratch/user/yafeili/704/defenceOutput/slurm_training_%j.err
-#SBATCH --time=48:00:00          # 48小时时间限制（根据实际需要调整）
+#SBATCH --time=48:00:00          # 48小时时间限制
+
+# ---- GPU 分区 + GPU 强制要求 ----
+#SBATCH --partition=gpu          # GPU分区
+#SBATCH --gres=gpu:1             # 1块GPU
+#SBATCH --constraint=gpu         # 强制使用GPU节点（防止fallback到CPU）
+
+# ---- 保守资源请求，确保GPU节点能够满足 ----
 #SBATCH --nodes=1                # 使用1个节点
 #SBATCH --ntasks-per-node=1      # 每个节点1个任务
-#SBATCH --cpus-per-task=32       # 32个CPU核心
-#SBATCH --mem=256G               # 256GB内存
-#SBATCH --gres=gpu:1             # 1块GPU
-#SBATCH --partition=gpu          # GPU分区（根据FASTER实际分区名称调整）
+#SBATCH --cpus-per-task=8        # 8个CPU核心（GPU节点通常8-16核）
+#SBATCH --mem=64G                # 64GB内存（GPU节点通常64-128GB）
 
 # 打印作业信息
 echo "=========================================="
@@ -37,10 +42,10 @@ module list
 # 设置CUDA设备
 export CUDA_VISIBLE_DEVICES=0
 
-# 设置性能优化环境变量
-export OMP_NUM_THREADS=32
-export MKL_NUM_THREADS=32
-export NUMEXPR_NUM_THREADS=32
+# 设置性能优化环境变量（匹配CPU核心数）
+export OMP_NUM_THREADS=8
+export MKL_NUM_THREADS=8
+export NUMEXPR_NUM_THREADS=8
 
 # 激活虚拟环境（尝试多个可能的位置）
 VENV_ACTIVATED=0
