@@ -2,7 +2,8 @@
 # 一键训练所有5个防御模型的脚本
 # 使用GPU训练，实时输出到nohup日志
 
-set -e  # 遇到错误立即退出
+# set -e  # 暂时注释掉，以便更好地捕获错误信息
+set -u  # 未定义变量时报错
 
 # ==================== 配置区域 ====================
 # 数据集路径（HPRC FASTER系统 - 已确认路径）
@@ -137,12 +138,18 @@ echo "  使用GPU: $USE_GPU"
 echo "  日志文件: $LOG_FILE"
 echo ""
 
-# 询问确认
-read -p "确认开始训练? (y/N) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "已取消"
-    exit 0
+# 询问确认（非交互式模式下自动确认）
+if [ -t 0 ] && [ -z "$SLURM_JOB_ID" ]; then
+    # 交互式模式：询问确认
+    read -p "确认开始训练? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "已取消"
+        exit 0
+    fi
+else
+    # 非交互式模式（SLURM作业）：自动确认
+    echo "非交互式模式：自动确认开始训练"
 fi
 
 # 开始训练（使用nohup在后台运行，输出到日志文件）
