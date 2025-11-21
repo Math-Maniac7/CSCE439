@@ -55,6 +55,25 @@ def load_multiple_jsonl_files(jsonl_files, max_samples_per_file=None):
     
     print(f"合并完成: {len(X_combined)} 个样本, {X_combined.shape[1]} 个特征")
     
+    # 数据清理：处理异常值
+    print("清理合并后的数据（处理inf和NaN）...")
+    import numpy as np
+    
+    # 统计异常值
+    inf_count = np.isinf(X_combined).sum()
+    nan_count = np.isnan(X_combined).sum()
+    
+    if inf_count > 0 or nan_count > 0:
+        print(f"  发现 {inf_count} 个inf值, {nan_count} 个NaN值，正在清理...")
+    
+    # 替换无穷大值和NaN
+    X_combined = np.nan_to_num(X_combined, nan=0.0, posinf=1e10, neginf=-1e10)
+    
+    # 限制数值范围到float32安全范围
+    X_combined = np.clip(X_combined, -1e10, 1e10).astype(np.float32)
+    
+    print(f"  数据清理完成")
+    
     gc.collect()  # 释放内存
     
     return X_combined, y_combined

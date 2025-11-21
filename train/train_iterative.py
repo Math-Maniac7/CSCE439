@@ -89,6 +89,33 @@ def train_single_iteration(model, dataset_dirs, iteration, max_samples=None, sam
         y_train = y_train[indices]
         print(f"采样后训练集: {len(X_train)} 个样本")
     
+    # 数据清理：处理无穷大值和NaN
+    print("清理数据（处理inf和NaN）...")
+    import numpy as np
+    
+    # 统计异常值
+    inf_count = np.isinf(X_train).sum()
+    nan_count = np.isnan(X_train).sum()
+    
+    if inf_count > 0 or nan_count > 0:
+        print(f"  发现 {inf_count} 个inf值, {nan_count} 个NaN值，正在清理...")
+    
+    # 替换无穷大值为有限值
+    # 使用非常小的负数和非常大的正数来替换-inf和+inf
+    X_train = np.nan_to_num(X_train, nan=0.0, posinf=1e10, neginf=-1e10)
+    X_test = np.nan_to_num(X_test, nan=0.0, posinf=1e10, neginf=-1e10)
+    
+    # 进一步限制数值范围到float32安全范围
+    # float32范围: -3.4e38 到 3.4e38
+    # 但我们使用更保守的范围以避免训练问题
+    max_val = 1e10
+    min_val = -1e10
+    X_train = np.clip(X_train, min_val, max_val).astype(np.float32)
+    X_test = np.clip(X_test, min_val, max_val).astype(np.float32)
+    
+    print(f"  数据清理完成，训练集形状: {X_train.shape}, 测试集形状: {X_test.shape}")
+    print(f"  数值范围: [{X_train.min():.2e}, {X_train.max():.2e}]")
+    
     # 训练模型
     print("开始训练...")
     model.fit(X_train, y_train)
