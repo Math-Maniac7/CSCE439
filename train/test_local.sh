@@ -10,8 +10,11 @@ echo "=========================================="
 echo ""
 
 # ==================== 配置区域 ====================
-# 数据集路径（请根据本地实际情况修改）
-DATASET_BASE="/Users/felix/Documents/704/dataset"  # 本地数据集路径
+# 数据集路径（根据实际情况修改）
+# 本地测试路径示例：
+# DATASET_BASE="/Users/felix/Documents/704/dataset"
+# HPRC系统路径：
+DATASET_BASE="/scratch/user/yafeili/704/dataset"
 
 # 三个EMBER数据集目录（至少需要一个）
 EMBER_DATASET_2017_2="$DATASET_BASE/ember_2017_2"

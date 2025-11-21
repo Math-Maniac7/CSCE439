@@ -11,7 +11,7 @@ DATASET_BASE="/scratch/user/yafeili/704/dataset"  # 数据集基础目录
 # 三个EMBER数据集目录（解压后的目录）
 EMBER_DATASET_2017_2="$DATASET_BASE/ember_2017_2"      # EMBER 2017_2数据集目录
 EMBER_DATASET_2018_2="$DATASET_BASE/ember2018"         # EMBER 2018数据集目录
-EMBER_DATASET="$DATASET_BASE/ember"                     # EMBER数据集目录（通用）
+EMBER_DATASET="$DATASET_BASE/ember"                     # EMBER数据集目录（通用，如果存在）
 
 # Challenge验证集目录
 CHALLENGE_DIR="$DATASET_BASE/challenge_ds"              # Challenge测试数据集目录
