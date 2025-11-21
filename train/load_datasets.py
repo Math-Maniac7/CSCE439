@@ -57,7 +57,6 @@ def load_multiple_jsonl_files(jsonl_files, max_samples_per_file=None):
     
     # 数据清理：处理异常值
     print("清理合并后的数据（处理inf和NaN）...")
-    import numpy as np
     
     # 统计异常值
     inf_count = np.isinf(X_combined).sum()

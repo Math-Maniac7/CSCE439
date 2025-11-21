@@ -82,7 +82,6 @@ def train_single_iteration(model, dataset_dirs, iteration, max_samples=None, sam
     
     # 如果指定了采样比例，对训练集进行采样
     if sample_ratio < 1.0:
-        import numpy as np
         sample_size = int(len(X_train) * sample_ratio)
         indices = np.random.choice(len(X_train), size=sample_size, replace=False)
         X_train = X_train[indices]
@@ -91,7 +90,6 @@ def train_single_iteration(model, dataset_dirs, iteration, max_samples=None, sam
     
     # 数据清理：处理无穷大值和NaN
     print("清理数据（处理inf和NaN）...")
-    import numpy as np
     
     # 统计异常值
     inf_count = np.isinf(X_train).sum()
