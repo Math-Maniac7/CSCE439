@@ -45,27 +45,34 @@ export NUMEXPR_NUM_THREADS=32
 # 激活虚拟环境（尝试多个可能的位置）
 VENV_ACTIVATED=0
 
+# 按优先级尝试激活虚拟环境
 if [ -f ~/venv/bin/activate ]; then
     source ~/venv/bin/activate
-    echo "Activated virtual environment: ~/venv"
+    echo "✓ Activated virtual environment: ~/venv"
+    VENV_ACTIVATED=1
+elif [ -f /scratch/user/yafeili/venv/bin/activate ]; then
+    source /scratch/user/yafeili/venv/bin/activate
+    echo "✓ Activated virtual environment: /scratch/user/yafeili/venv"
     VENV_ACTIVATED=1
 elif [ -f $SCRATCH/venv/bin/activate ]; then
     source $SCRATCH/venv/bin/activate
-    echo "Activated virtual environment: $SCRATCH/venv"
-    VENV_ACTIVATED=1
-elif [ -f "/scratch/user/yafeili/venv/bin/activate" ]; then
-    source /scratch/user/yafeili/venv/bin/activate
-    echo "Activated virtual environment: /scratch/user/yafeili/venv"
+    echo "✓ Activated virtual environment: $SCRATCH/venv"
     VENV_ACTIVATED=1
 fi
 
 if [ $VENV_ACTIVATED -eq 0 ]; then
-    echo "Warning: Virtual environment not found, using system Python"
+    echo "⚠ Warning: Virtual environment not found, using system Python"
+    echo ""
     echo "建议：创建虚拟环境以确保所有依赖已安装"
-    echo "      python3 -m venv ~/venv"
-    echo "      source ~/venv/bin/activate"
-    echo "      pip install numpy pandas scikit-learn tqdm lightgbm pefile lief requests"
-    echo "      pip install git+https://github.com/endgameinc/ember.git"
+    echo "  在登录节点运行："
+    echo "    module load GCCcore/12.2.0 Python/3.10.8"
+    echo "    python3 -m venv ~/venv"
+    echo "    source ~/venv/bin/activate"
+    echo "    pip install --upgrade pip"
+    echo "    pip install numpy pandas scikit-learn tqdm lightgbm pefile lief requests"
+    echo "    pip install git+https://github.com/endgameinc/ember.git"
+    echo ""
+    echo "继续使用系统Python（可能缺少某些依赖）..."
 fi
 
 # 验证Python和GPU
@@ -76,18 +83,19 @@ echo ""
 echo "GPU status:"
 nvidia-smi
 
-# 进入项目目录（尝试多个可能的路径）
-if [ -d "/scratch/user/yafeili/CSCE439" ]; then
-    cd /scratch/user/yafeili/CSCE439
-elif [ -d "/scratch/user/yafeili/704/CSCE439" ]; then
-    cd /scratch/user/yafeili/704/CSCE439
-elif [ -d "$SCRATCH/CSCE439" ]; then
-    cd $SCRATCH/CSCE439
+# 进入项目目录（根据实际路径）
+PROJECT_DIR="/scratch/user/yafeili/CSCE439"
+if [ -d "$PROJECT_DIR" ]; then
+    cd "$PROJECT_DIR"
+    echo "进入项目目录: $PROJECT_DIR"
 else
-    echo "错误: 找不到项目目录"
+    echo "错误: 项目目录不存在: $PROJECT_DIR"
     echo "尝试查找CSCE439目录..."
-    find $SCRATCH -name "CSCE439" -type d 2>/dev/null | head -1 | xargs cd
-    if [ $? -ne 0 ]; then
+    FOUND_DIR=$(find $SCRATCH -name "CSCE439" -type d 2>/dev/null | head -1)
+    if [ -n "$FOUND_DIR" ] && [ -d "$FOUND_DIR" ]; then
+        cd "$FOUND_DIR"
+        echo "找到项目目录: $FOUND_DIR"
+    else
         echo "错误: 无法找到项目目录，请检查路径"
         exit 1
     fi
@@ -97,15 +105,20 @@ echo ""
 echo "Working directory: $(pwd)"
 echo ""
 
-# 检查数据集目录（尝试多个可能的路径）
+# 检查数据集目录（根据实际路径）
 echo "Checking dataset directories..."
-if [ -d "/scratch/user/yafeili/704/dataset" ]; then
-    DATASET_BASE="/scratch/user/yafeili/704/dataset"
-elif [ -d "/scratch/user/yafeili/dataset" ]; then
-    DATASET_BASE="/scratch/user/yafeili/dataset"
-else
-    echo "警告: 找不到数据集基础目录"
-    DATASET_BASE="/scratch/user/yafeili/704/dataset"
+DATASET_BASE="/scratch/user/yafeili/704/dataset"
+if [ ! -d "$DATASET_BASE" ]; then
+    echo "警告: 数据集基础目录不存在: $DATASET_BASE"
+    echo "尝试查找dataset目录..."
+    FOUND_DATASET=$(find $SCRATCH -name "dataset" -type d 2>/dev/null | head -1)
+    if [ -n "$FOUND_DATASET" ] && [ -d "$FOUND_DATASET" ]; then
+        DATASET_BASE="$FOUND_DATASET"
+        echo "找到数据集目录: $DATASET_BASE"
+    else
+        echo "错误: 无法找到数据集目录"
+        exit 1
+    fi
 fi
 
 echo "Dataset base directory: $DATASET_BASE"
