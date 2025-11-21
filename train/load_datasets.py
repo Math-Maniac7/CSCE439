@@ -3,10 +3,61 @@
 从多个EMBER数据集目录加载数据并自动切分
 """
 
+import json
 import numpy as np
 from pathlib import Path
+from tqdm import tqdm
+import gc
 from sklearn.model_selection import train_test_split
-from train_ember_jsonl import load_ember_jsonl, load_multiple_jsonl_files
+
+# 添加当前目录到路径以确保可以导入
+import sys
+sys.path.insert(0, str(Path(__file__).parent))
+
+# 导入train_ember_jsonl中的函数
+from train_ember_jsonl import load_ember_jsonl
+
+
+def load_multiple_jsonl_files(jsonl_files, max_samples_per_file=None):
+    """
+    加载多个JSONL文件并合并
+    
+    Args:
+        jsonl_files: JSONL文件路径列表
+        max_samples_per_file: 每个文件最大加载样本数（None表示加载全部）
+    
+    Returns:
+        X_combined: 合并后的特征数组
+        y_combined: 合并后的标签数组
+    """
+    all_features = []
+    all_labels = []
+    
+    print(f"\n开始加载 {len(jsonl_files)} 个JSONL文件...")
+    
+    for file_path in tqdm(jsonl_files, desc="加载文件"):
+        try:
+            features, labels = load_ember_jsonl(file_path, max_samples=max_samples_per_file)
+            if features.size > 0:
+                all_features.append(features)
+                all_labels.append(labels)
+                print(f"  ✓ {file_path.name}: {len(features)} 样本")
+        except Exception as e:
+            print(f"  ✗ 加载文件 {file_path} 时出错: {e}")
+            continue
+    
+    if not all_features:
+        raise ValueError("未能从任何文件中加载有效数据")
+    
+    print(f"\n合并数据...")
+    X_combined = np.vstack(all_features)
+    y_combined = np.concatenate(all_labels)
+    
+    print(f"合并完成: {len(X_combined)} 个样本, {X_combined.shape[1]} 个特征")
+    
+    gc.collect()  # 释放内存
+    
+    return X_combined, y_combined
 
 
 def load_all_ember_datasets(dataset_dirs, max_samples_per_file=None, test_split=0.2, random_state=42):
