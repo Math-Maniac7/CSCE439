@@ -50,10 +50,21 @@ def load_multiple_jsonl_files(jsonl_files, max_samples_per_file=None):
         raise ValueError("未能从任何文件中加载有效数据")
     
     print(f"\n合并数据...")
-    X_combined = np.vstack(all_features)
-    y_combined = np.concatenate(all_labels)
-    
-    print(f"合并完成: {len(X_combined)} 个样本, {X_combined.shape[1]} 个特征")
+    try:
+        X_combined = np.vstack(all_features)
+        y_combined = np.concatenate(all_labels)
+        print(f"合并完成: {len(X_combined)} 个样本, {X_combined.shape[1]} 个特征")
+    except MemoryError as e:
+        print(f"错误: 内存不足，无法合并数据")
+        print(f"  总样本数: {sum(len(f) for f in all_features)}")
+        print(f"  特征维度: {all_features[0].shape[1] if all_features else 'N/A'}")
+        print(f"  估计内存需求: {sum(len(f) * f.shape[1] * 4 for f in all_features) / 1024**3:.2f} GB")
+        raise MemoryError(f"内存不足，无法合并 {len(all_features)} 个文件的数据。请减少数据集或使用采样。") from e
+    except Exception as e:
+        print(f"错误: 合并数据时出错: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
     
     # 数据清理：处理异常值
     print("清理合并后的数据（处理inf和NaN）...")

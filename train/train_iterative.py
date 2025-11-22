@@ -140,6 +140,26 @@ def train_single_iteration(model, dataset_dirs, iteration, max_samples=None, sam
 
 
 def main():
+    try:
+        _main()
+    except KeyboardInterrupt:
+        print("\n\n训练被用户中断")
+        sys.exit(1)
+    except MemoryError as e:
+        print(f"\n\n内存不足错误: {e}")
+        print("建议:")
+        print("  1. 减少数据集大小（使用 --max-samples）")
+        print("  2. 使用采样（使用 --sample-ratio < 1.0）")
+        print("  3. 增加SLURM作业的内存限制（--mem）")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n\n训练过程中发生错误: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def _main():
     parser = argparse.ArgumentParser(description='迭代训练防御模型')
     parser.add_argument('--model-id', type=str, required=True,
                        choices=['model1', 'model2', 'model3', 'model4', 'model5'],

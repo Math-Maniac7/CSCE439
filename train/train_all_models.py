@@ -54,10 +54,20 @@ def train_and_test_model(model_id, dataset_dirs, challenge_dir,
     result = subprocess.run(train_cmd, capture_output=True, text=True)
     
     if result.returncode != 0:
-        print(f"训练失败: {result.stderr}")
+        print(f"\n{'='*80}")
+        print(f"训练失败 (退出码: {result.returncode})")
+        print(f"{'='*80}")
+        if result.stdout:
+            print("STDOUT:")
+            print(result.stdout)
+        if result.stderr:
+            print("STDERR:")
+            print(result.stderr)
+        print(f"{'='*80}\n")
         return None
     
-    print(result.stdout)
+    if result.stdout:
+        print(result.stdout)
     
     # 2. 测试模型
     model_path = Path(output_dir) / model_id / f"{model_id}_best.pickle"
