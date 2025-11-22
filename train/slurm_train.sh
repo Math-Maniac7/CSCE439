@@ -47,6 +47,19 @@ export OMP_NUM_THREADS=8
 export MKL_NUM_THREADS=8
 export NUMEXPR_NUM_THREADS=8
 
+# ==================== 设置临时目录（避免home目录磁盘配额问题）====================
+# LightGBM会在临时目录创建缓存文件，home目录配额通常很小
+# 将临时目录设置到scratch目录，那里有更多空间
+export TMPDIR="$SCRATCH/tmp"
+export TMP="$SCRATCH/tmp"
+export TEMPDIR="$SCRATCH/tmp"
+
+# 创建临时目录（如果不存在）
+mkdir -p "$TMPDIR"
+echo "✓ 临时目录设置为: $TMPDIR"
+echo "  这会避免home目录磁盘配额问题"
+echo ""
+
 # 激活虚拟环境（尝试多个可能的位置）
 VENV_ACTIVATED=0
 
@@ -123,7 +136,23 @@ echo ""
 echo "Working directory: $(pwd)"
 echo ""
 
-# 检查数据集目录（已确认路径）
+# ==================== 设置临时目录（避免home目录磁盘配额问题）====================
+# LightGBM会在临时目录创建缓存文件，home目录配额通常很小
+# 将临时目录设置到scratch目录，那里有更多空间
+export TMPDIR="$SCRATCH/tmp"
+export TMP="$SCRATCH/tmp"
+export TEMPDIR="$SCRATCH/tmp"
+
+# 创建临时目录（如果不存在）
+mkdir -p "$TMPDIR"
+echo "✓ 临时目录设置为: $TMPDIR"
+echo "  这会避免home目录磁盘配额问题"
+echo ""
+
+# 清理旧的临时文件（可选，避免占用过多空间）
+# find "$TMPDIR" -name "*.boost_compute*" -type f -mtime +1 -delete 2>/dev/null || true
+
+# ==================== 检查数据集目录（已确认路径）====================
 echo "Checking dataset directories..."
 DATASET_BASE="/scratch/user/yafeili/704/dataset"
 if [ ! -d "$DATASET_BASE" ]; then
