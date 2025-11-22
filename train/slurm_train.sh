@@ -147,10 +147,26 @@ export TEMPDIR="$SCRATCH/tmp"
 mkdir -p "$TMPDIR"
 echo "✓ 临时目录设置为: $TMPDIR"
 echo "  这会避免home目录磁盘配额问题"
-echo ""
 
-# 清理旧的临时文件（可选，避免占用过多空间）
-# find "$TMPDIR" -name "*.boost_compute*" -type f -mtime +1 -delete 2>/dev/null || true
+# 如果LightGBM仍然使用home目录，创建符号链接重定向到SCRATCH
+HOME_BOOST_COMPUTE="$HOME/.boost_compute"
+if [ -d "$HOME_BOOST_COMPUTE" ]; then
+    # 如果目录存在，尝试删除它（如果可能）
+    rm -rf "$HOME_BOOST_COMPUTE" 2>/dev/null || true
+fi
+# 创建符号链接，将home目录的.boost_compute指向SCRATCH
+if [ ! -e "$HOME_BOOST_COMPUTE" ]; then
+    mkdir -p "$SCRATCH/tmp/.boost_compute" 2>/dev/null || true
+    ln -sf "$SCRATCH/tmp/.boost_compute" "$HOME_BOOST_COMPUTE" 2>/dev/null || true
+    if [ -L "$HOME_BOOST_COMPUTE" ] || [ -e "$HOME_BOOST_COMPUTE" ]; then
+        echo "✓ 创建符号链接: $HOME_BOOST_COMPUTE -> $SCRATCH/tmp/.boost_compute"
+    fi
+fi
+
+# 清理旧的临时文件（避免占用过多空间）
+find "$TMPDIR" -name ".boost_compute*" -type d -mtime +1 -exec rm -rf {} + 2>/dev/null || true
+
+echo ""
 
 # ==================== 检查数据集目录（已确认路径）====================
 echo "Checking dataset directories..."
