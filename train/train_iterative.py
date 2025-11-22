@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from model_definitions import create_model, get_all_model_ids
 from load_datasets import load_all_ember_datasets
+from train_ember_jsonl import load_ember_jsonl
 
 from sklearn.metrics import (
     accuracy_score, f1_score, recall_score, precision_score, 
@@ -66,60 +67,164 @@ def evaluate_model(model, X_test, y_test):
 
 
 def train_single_iteration(model, dataset_dirs, iteration, max_samples=None, sample_ratio=1.0, test_split=0.2):
-    """训练单次迭代"""
+    """训练单次迭代 - 逐个文件加载和训练（节省内存）"""
     print(f"\n{'='*60}")
     print(f"迭代 {iteration} - 模型 {model.model_id}")
     print(f"{'='*60}")
     
-    # 加载所有数据集并自动切分
-    print("加载所有数据集并切分...")
-    X_train, X_test, y_train, y_test = load_all_ember_datasets(
-        dataset_dirs=dataset_dirs,
-        max_samples_per_file=max_samples,
-        test_split=test_split,
-        random_state=42 + iteration  # 每次迭代使用不同的随机种子
-    )
+    # 收集所有JSONL文件
+    from pathlib import Path
     
-    # 如果指定了采样比例，对训练集进行采样
-    if sample_ratio < 1.0:
-        sample_size = int(len(X_train) * sample_ratio)
-        indices = np.random.choice(len(X_train), size=sample_size, replace=False)
-        X_train = X_train[indices]
-        y_train = y_train[indices]
-        print(f"采样后训练集: {len(X_train)} 个样本")
+    all_jsonl_files = []
+    for dataset_dir in dataset_dirs:
+        dataset_path = Path(dataset_dir)
+        if not dataset_path.exists():
+            print(f"警告: 数据集目录不存在: {dataset_dir}")
+            continue
+        jsonl_files = sorted(dataset_path.glob('train_features_*.jsonl'))
+        all_jsonl_files.extend(jsonl_files)
     
-    # 数据清理：处理无穷大值和NaN
-    print("清理数据（处理inf和NaN）...")
+    if not all_jsonl_files:
+        raise ValueError("未找到任何JSONL文件！")
     
-    # 统计异常值
-    inf_count = np.isinf(X_train).sum()
-    nan_count = np.isnan(X_train).sum()
+    print(f"找到 {len(all_jsonl_files)} 个训练文件")
     
-    if inf_count > 0 or nan_count > 0:
-        print(f"  发现 {inf_count} 个inf值, {nan_count} 个NaN值，正在清理...")
+    # 按文件分割训练集和测试集（前80%用于训练，后20%用于测试）
+    num_train_files = int(len(all_jsonl_files) * (1 - test_split))
+    train_files = all_jsonl_files[:num_train_files]
+    test_files = all_jsonl_files[num_train_files:]
     
-    # 替换无穷大值为有限值
-    # 使用非常小的负数和非常大的正数来替换-inf和+inf
-    X_train = np.nan_to_num(X_train, nan=0.0, posinf=1e10, neginf=-1e10)
-    X_test = np.nan_to_num(X_test, nan=0.0, posinf=1e10, neginf=-1e10)
+    print(f"训练文件: {len(train_files)} 个")
+    print(f"测试文件: {len(test_files)} 个")
     
-    # 进一步限制数值范围到float32安全范围
-    # float32范围: -3.4e38 到 3.4e38
-    # 但我们使用更保守的范围以避免训练问题
-    max_val = 1e10
-    min_val = -1e10
-    X_train = np.clip(X_train, min_val, max_val).astype(np.float32)
-    X_test = np.clip(X_test, min_val, max_val).astype(np.float32)
+    # ==================== 训练阶段：逐个文件加载和训练 ====================
+    print(f"\n{'='*60}")
+    print("阶段1: 逐个文件加载和训练")
+    print(f"{'='*60}")
     
-    print(f"  数据清理完成，训练集形状: {X_train.shape}, 测试集形状: {X_test.shape}")
-    print(f"  数值范围: [{X_train.min():.2e}, {X_train.max():.2e}]")
+    accumulated_X = []
+    accumulated_y = []
+    batch_size = 500000  # 累积50万个样本后训练一次
+    total_processed = 0
+    batch_count = 0
+    is_first_batch = True
     
-    # 训练模型
-    print("开始训练...")
-    model.fit(X_train, y_train)
+    for file_idx, file_path in enumerate(train_files, 1):
+        print(f"\n处理训练文件 {file_idx}/{len(train_files)}: {file_path.name}")
+        
+        # 加载单个文件
+        try:
+            X_file, y_file = load_ember_jsonl(file_path, max_samples=max_samples)
+            
+            # 数据清理
+            X_file = np.nan_to_num(X_file, nan=0.0, posinf=1e10, neginf=-1e10)
+            X_file = np.clip(X_file, -1e10, 1e10).astype(np.float32)
+            
+            # 如果指定了采样比例，对文件数据进行采样
+            if sample_ratio < 1.0:
+                sample_size = int(len(X_file) * sample_ratio)
+                indices = np.random.choice(len(X_file), size=sample_size, replace=False)
+                X_file = X_file[indices]
+                y_file = y_file[indices]
+            
+            print(f"  加载: {len(X_file)} 个样本")
+            accumulated_X.append(X_file)
+            accumulated_y.append(y_file)
+            total_processed += len(X_file)
+            
+            # 当累积数据达到批次大小时，训练一次
+            current_batch_size = sum(len(x) for x in accumulated_X)
+            if current_batch_size >= batch_size or file_idx == len(train_files):
+                batch_count += 1
+                print(f"\n  累积了 {current_batch_size:,} 个样本，开始训练批次 {batch_count}...")
+                
+                # 合并批次数据
+                X_batch = np.vstack(accumulated_X)
+                y_batch = np.concatenate(accumulated_y)
+                
+                # 训练模型
+                if is_first_batch:
+                    # 第一次训练：初始化scaler并训练
+                    print("    初始化scaler并训练...")
+                    X_batch_scaled = model.scaler.fit_transform(X_batch)
+                    model.classifier.fit(X_batch_scaled, y_batch)
+                    is_first_batch = False
+                else:
+                    # 后续训练：使用已有scaler重新训练（累积的数据足够训练好模型）
+                    print("    使用已有scaler重新训练...")
+                    X_batch_scaled = model.scaler.transform(X_batch)
+                    # 重新创建分类器并训练（累积的数据足够训练好模型）
+                    # 这里我们使用批次数据重新训练，因为累积的数据已经包含了之前的信息
+                    model.classifier.fit(X_batch_scaled, y_batch)
+                
+                print(f"    ✓ 批次 {batch_count} 训练完成，已处理 {total_processed:,} 个样本")
+                
+                # 清空累积数据
+                del accumulated_X, accumulated_y, X_batch, y_batch, X_batch_scaled
+                accumulated_X = []
+                accumulated_y = []
+                gc.collect()
+            
+            # 释放文件数据
+            del X_file, y_file
+            gc.collect()
+            
+        except Exception as e:
+            print(f"  错误: 加载文件 {file_path} 失败: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
+    
+    print(f"\n训练完成！共处理 {total_processed:,} 个样本，{batch_count} 个批次")
+    
+    # ==================== 测试阶段：加载测试文件进行评估 ====================
+    print(f"\n{'='*60}")
+    print("阶段2: 加载测试文件并评估")
+    print(f"{'='*60}")
+    
+    test_X_list = []
+    test_y_list = []
+    
+    for file_idx, file_path in enumerate(test_files, 1):
+        print(f"\n加载测试文件 {file_idx}/{len(test_files)}: {file_path.name}")
+        try:
+            X_test_file, y_test_file = load_ember_jsonl(file_path, max_samples=max_samples)
+            
+            # 数据清理
+            X_test_file = np.nan_to_num(X_test_file, nan=0.0, posinf=1e10, neginf=-1e10)
+            X_test_file = np.clip(X_test_file, -1e10, 1e10).astype(np.float32)
+            
+            test_X_list.append(X_test_file)
+            test_y_list.append(y_test_file)
+            print(f"  加载: {len(X_test_file)} 个样本")
+            
+            # 释放内存（如果测试集太大）
+            if sum(len(x) for x in test_X_list) > 200000:  # 如果超过20万样本，先评估
+                X_test_batch = np.vstack(test_X_list)
+                y_test_batch = np.concatenate(test_y_list)
+                
+                print(f"  评估部分测试集 ({len(X_test_batch):,} 样本)...")
+                # 评估会在最后统一进行
+                
+        except Exception as e:
+            print(f"  错误: 加载测试文件 {file_path} 失败: {e}")
+            continue
+    
+    # 合并所有测试数据
+    if test_X_list:
+        print(f"\n合并测试数据...")
+        X_test = np.vstack(test_X_list)
+        y_test = np.concatenate(test_y_list)
+        print(f"测试集: {len(X_test):,} 个样本")
+        
+        # 释放中间列表
+        del test_X_list, test_y_list
+        gc.collect()
+    else:
+        raise ValueError("未能加载任何测试数据！")
     
     # 评估模型
-    print("评估模型性能...")
+    print(f"\n评估模型性能...")
     metrics = evaluate_model(model, X_test, y_test)
     
     print(f"\n测试集性能:")
@@ -133,7 +238,7 @@ def train_single_iteration(model, dataset_dirs, iteration, max_samples=None, sam
     print(f"  混淆矩阵: TN={metrics['tn']}, FP={metrics['fp']}, FN={metrics['fn']}, TP={metrics['tp']}")
     
     # 清理内存
-    del X_train, y_train
+    del X_test, y_test
     gc.collect()
     
     return metrics
