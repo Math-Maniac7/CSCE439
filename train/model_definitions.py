@@ -25,19 +25,11 @@ if 'SCRATCH' in os.environ:
     os.environ['BOOST_COMPUTE_CACHE_DIR'] = scratch_tmp
 # ================================================
 
-# 尝试导入GPU加速的库
-try:
-    import lightgbm as lgb
-    HAS_LIGHTGBM = True
-except ImportError:
-    HAS_LIGHTGBM = False
+# 禁用LightGBM和XGBoost，全部使用scikit-learn（避免磁盘配额问题）
+HAS_LIGHTGBM = False  # 强制禁用LightGBM
+HAS_XGBOOST = False   # 强制禁用XGBoost
 
-try:
-    import xgboost as xgb
-    HAS_XGBOOST = True
-except ImportError:
-    HAS_XGBOOST = False
-    print("⚠ XGBoost not available, Model3 will use GradientBoostingClassifier")
+print("ℹ 使用scikit-learn模型（RandomForest和GradientBoosting），避免LightGBM磁盘配额问题")
 
 
 class BaseModel:
@@ -77,102 +69,60 @@ class BaseModel:
         print(f"模型 {self.model_id} 已保存到: {filepath}")
 
 
-class Model1_LightGBM_Deep(BaseModel):
-    """模型1: LightGBM深度模型 - 更多树，更深深度"""
+class Model1_RandomForest_Deep(BaseModel):
+    """模型1: RandomForest深度模型 - 更多树，更深深度"""
     
     def __init__(self, use_gpu=True):
-        super().__init__("model1_lgb_deep", use_gpu)
-        if self.use_gpu and HAS_LIGHTGBM:
-            device = 'gpu' if os.environ.get('CUDA_VISIBLE_DEVICES') else 'cpu'
-            self.classifier = lgb.LGBMClassifier(
-                n_estimators=1500,
-                max_depth=35,
-                learning_rate=0.03,
-                num_leaves=63,
-                feature_fraction=0.8,
-                bagging_fraction=0.8,
-                bagging_freq=5,
-                min_child_samples=20,
-                device=device,
-                gpu_platform_id=0,
-                gpu_device_id=0,
-                random_state=42,
-                verbose=1,
-                n_jobs=-1
-            )
-        else:
-            self.classifier = RandomForestClassifier(
-                n_estimators=1000,
-                max_depth=35,
-                max_features='sqrt',
-                n_jobs=-1,
-                random_state=42,
-                verbose=1
-            )
+        super().__init__("model1_rf_deep", use_gpu)
+        # 使用RandomForest替代LightGBM
+        self.classifier = RandomForestClassifier(
+            n_estimators=1500,  # 更多树以补偿LightGBM的性能
+            max_depth=35,
+            max_features='sqrt',
+            min_samples_split=5,
+            min_samples_leaf=2,
+            n_jobs=-1,
+            random_state=42,
+            verbose=1
+        )
 
 
-class Model2_LightGBM_Wide(BaseModel):
-    """模型2: LightGBM宽模型 - 更多叶子节点，更宽树"""
+class Model2_GradientBoosting_Wide(BaseModel):
+    """模型2: GradientBoosting宽模型 - 更宽的树结构"""
     
     def __init__(self, use_gpu=True):
-        super().__init__("model2_lgb_wide", use_gpu)
-        if self.use_gpu and HAS_LIGHTGBM:
-            device = 'gpu' if os.environ.get('CUDA_VISIBLE_DEVICES') else 'cpu'
-            self.classifier = lgb.LGBMClassifier(
-                n_estimators=1200,
-                max_depth=25,
-                learning_rate=0.05,
-                num_leaves=127,  # 更宽的树
-                feature_fraction=0.9,
-                bagging_fraction=0.9,
-                bagging_freq=3,
-                min_child_samples=30,
-                device=device,
-                gpu_platform_id=0,
-                gpu_device_id=0,
-                random_state=43,
-                verbose=1,
-                n_jobs=-1
-            )
-        else:
-            self.classifier = RandomForestClassifier(
-                n_estimators=800,
-                max_depth=25,
-                max_features='log2',
-                n_jobs=-1,
-                random_state=43,
-                verbose=1
-            )
+        super().__init__("model2_gb_wide", use_gpu)
+        # 使用GradientBoosting替代LightGBM
+        self.classifier = GradientBoostingClassifier(
+            n_estimators=1200,
+            max_depth=25,
+            learning_rate=0.05,
+            subsample=0.9,  # 类似bagging_fraction
+            max_features=0.9,  # 类似feature_fraction
+            min_samples_split=30,
+            min_samples_leaf=10,
+            random_state=43,
+            verbose=1
+        )
 
 
-class Model3_XGBoost(BaseModel):
-    """模型3: XGBoost模型 - 不同的boosting算法"""
+class Model3_GradientBoosting(BaseModel):
+    """模型3: GradientBoosting模型 - 不同的boosting算法"""
     
     def __init__(self, use_gpu=True):
-        super().__init__("model3_xgb", use_gpu)
-        if self.use_gpu and HAS_XGBOOST:
-            tree_method = 'gpu_hist' if os.environ.get('CUDA_VISIBLE_DEVICES') else 'hist'
-            self.classifier = xgb.XGBClassifier(
-                n_estimators=1000,
-                max_depth=30,
-                learning_rate=0.04,
-                subsample=0.8,
-                colsample_bytree=0.8,
-                min_child_weight=3,
-                tree_method=tree_method,
-                random_state=44,
-                n_jobs=-1,
-                verbosity=1
-            )
-        else:
-            self.classifier = GradientBoostingClassifier(
-                n_estimators=800,
-                max_depth=30,
-                learning_rate=0.05,
-                subsample=0.8,
-                random_state=44,
-                verbose=1
-            )
+        super().__init__("model3_gb", use_gpu)
+        # 使用GradientBoosting替代XGBoost
+        self.classifier = GradientBoostingClassifier(
+            n_estimators=1000,
+            max_depth=30,
+            learning_rate=0.04,
+            subsample=0.8,
+            max_features=0.8,  # 类似colsample_bytree
+            min_samples_split=10,
+            min_samples_leaf=3,
+            random_state=44,
+            verbose=1
+        )
 
 
 class Model4_RandomForest_Ensemble(BaseModel):
@@ -192,49 +142,33 @@ class Model4_RandomForest_Ensemble(BaseModel):
         )
 
 
-class Model5_LightGBM_Fast(BaseModel):
-    """模型5: LightGBM快速模型 - 平衡速度和性能"""
+class Model5_RandomForest_Fast(BaseModel):
+    """模型5: RandomForest快速模型 - 平衡速度和性能"""
     
     def __init__(self, use_gpu=True):
-        super().__init__("model5_lgb_fast", use_gpu)
-        if self.use_gpu and HAS_LIGHTGBM:
-            device = 'gpu' if os.environ.get('CUDA_VISIBLE_DEVICES') else 'cpu'
-            self.classifier = lgb.LGBMClassifier(
-                n_estimators=800,
-                max_depth=20,
-                learning_rate=0.06,
-                num_leaves=31,
-                feature_fraction=0.85,
-                bagging_fraction=0.85,
-                bagging_freq=5,
-                min_child_samples=25,
-                device=device,
-                gpu_platform_id=0,
-                gpu_device_id=0,
-                random_state=46,
-                verbose=1,
-                n_jobs=-1
-            )
-        else:
-            self.classifier = RandomForestClassifier(
-                n_estimators=600,
-                max_depth=20,
-                max_features='sqrt',
-                n_jobs=-1,
-                random_state=46,
-                verbose=1
-            )
+        super().__init__("model5_rf_fast", use_gpu)
+        # 使用RandomForest替代LightGBM
+        self.classifier = RandomForestClassifier(
+            n_estimators=800,  # 增加树的数量以补偿性能
+            max_depth=20,
+            max_features='sqrt',
+            min_samples_split=25,
+            min_samples_leaf=10,
+            n_jobs=-1,
+            random_state=46,
+            verbose=1
+        )
 
 
 # 模型工厂函数
 def create_model(model_id, use_gpu=True):
     """根据模型ID创建对应的模型实例"""
     models = {
-        "model1": Model1_LightGBM_Deep,
-        "model2": Model2_LightGBM_Wide,
-        "model3": Model3_XGBoost,
+        "model1": Model1_RandomForest_Deep,
+        "model2": Model2_GradientBoosting_Wide,
+        "model3": Model3_GradientBoosting,
         "model4": Model4_RandomForest_Ensemble,
-        "model5": Model5_LightGBM_Fast,
+        "model5": Model5_RandomForest_Fast,
     }
     
     if model_id not in models:
