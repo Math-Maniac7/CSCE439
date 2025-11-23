@@ -13,9 +13,8 @@ from tqdm import tqdm
 import sys
 import os
 
-# ==================== 设置临时目录（避免home目录磁盘配额问题）====================
-# LightGBM使用boost库，可能不遵循TMPDIR环境变量
-# 需要在Python层面强制设置
+# ==================== 设置临时目录（通用设置）====================
+# 设置临时目录到SCRATCH，避免home目录磁盘配额问题
 if 'SCRATCH' in os.environ:
     scratch_tmp = os.path.join(os.environ['SCRATCH'], 'tmp')
     os.makedirs(scratch_tmp, exist_ok=True)
@@ -24,20 +23,7 @@ if 'SCRATCH' in os.environ:
     os.environ['TMP'] = scratch_tmp
     os.environ['TEMPDIR'] = scratch_tmp
     os.environ['TEMP'] = scratch_tmp
-    # 设置boost计算缓存目录（如果LightGBM支持）
-    os.environ['BOOST_COMPUTE_CACHE_DIR'] = scratch_tmp
     print(f"✓ 临时目录已设置为: {scratch_tmp}")
-    
-    # 清理home目录中可能存在的旧.boost_compute文件
-    home_dir = os.path.expanduser('~')
-    boost_compute_dir = os.path.join(home_dir, '.boost_compute')
-    if os.path.exists(boost_compute_dir):
-        try:
-            import shutil
-            shutil.rmtree(boost_compute_dir, ignore_errors=True)
-            print(f"✓ 已清理home目录的.boost_compute缓存: {boost_compute_dir}")
-        except Exception as e:
-            print(f"⚠ 无法清理home目录缓存: {e}")
 # ================================================
 
 # 导入模型定义和数据加载函数

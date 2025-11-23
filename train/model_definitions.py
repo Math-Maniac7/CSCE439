@@ -11,9 +11,8 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC
 import pickle
 
-# ==================== 设置临时目录（避免home目录磁盘配额问题）====================
-# LightGBM使用boost库，可能不遵循TMPDIR环境变量
-# 需要在Python层面强制设置
+# ==================== 设置临时目录（通用设置）====================
+# 设置临时目录到SCRATCH，避免home目录磁盘配额问题
 if 'SCRATCH' in os.environ:
     scratch_tmp = os.path.join(os.environ['SCRATCH'], 'tmp')
     os.makedirs(scratch_tmp, exist_ok=True)
@@ -22,7 +21,6 @@ if 'SCRATCH' in os.environ:
     os.environ['TMP'] = scratch_tmp
     os.environ['TEMPDIR'] = scratch_tmp
     os.environ['TEMP'] = scratch_tmp
-    os.environ['BOOST_COMPUTE_CACHE_DIR'] = scratch_tmp
 # ================================================
 
 # 禁用LightGBM和XGBoost，全部使用scikit-learn（避免磁盘配额问题）
