@@ -22,28 +22,32 @@ Aug 6 - Sep 18, 2020 (AoE)
 
 
 ## Model1 Attack Toolkit
-The `model1` folder collects the five Colab methods from the original `attack2.py`
-notebook and turns each into a standalone pipeline that can be executed locally.
-Every script performs the same high-level steps: import the encrypted dataset
-archive, unzip/extract into an isolated workspace, run the corresponding attack
-logic, emit `compare_report.csv` + `sha256sums.txt`, and finally compress the
-results back into a zip bundle for sharing.
+The `model1` folder contains 5 optimized attack methods that combine the best
+techniques from previous implementations. Every script performs the same
+high-level steps: import the encrypted dataset archive, unzip/extract into an
+isolated workspace, run the corresponding attack logic, emit `compare_report.csv`
++ `sha256sums.txt`, and finally compress the results back into a zip bundle for
+sharing.
 
-- `method1_dropper.py` - Cross-compiled dropper that XOR/Base64 encrypts each
-  payload, generates a Windows stub with MinGW, and falls back to copying if
-  compilation fails.
-- `method2_hybrid_overlay.py` - Hybrid overlay/dropper/PE-mod pipeline that
-  mixes large benign padding, compiled droppers, and header tweaks per file
-  index.
-- `method3_safe_overlay.py` - Safe overlay-only strategies that strictly modify
-  non-executable regions (plain overlay, timestamp+overlay, aggressive overlay)
-  to maintain behavioral equivalence.
-- `method4_agent.py` - Advanced agent that chains timestamp tweaks, benign
-  padding, UPX, AES crypter, and dropper tools with capa validation and HTTP
-  model scoring.
-- `method5_llm_agent.py` - LLM-guided agent that leverages the Gemini API for
-  scoring and keeps iterating through the same transformation toolbox until the
-  LLM score falls below the configured target.
+- `methodA_dropper_metadata_overlay.py` - **Combined method**: Dropper (XOR+Base64
+  encrypted payload in C++ stub) + Metadata mutation (TimeDateStamp randomization,
+  CheckSum=0) + Low-entropy overlay (~1MB). Loader writes to %TEMP% and executes
+  via CreateProcess. Includes benign features (Windows version strings, dead code
+  paths, registry lookups).
+
+- `methodB_section_rename_overlay.py` - Section renaming (.text→.code, .data→.info)
+  + Benign overlay with section-like patterns. Preserves all imports and functionality.
+
+- `methodC_import_obfuscation.py` - Import table obfuscation + Padding. Adds benign
+  import strings, modifies import metadata, adds large padding with import-like patterns.
+
+- `methodD_resource_manipulation.py` - Resource table manipulation + Overlay.
+  Modifies resource entries, adds fake resources with benign data, appends overlay
+  with resource-like patterns.
+
+- `methodE_multilayer_padding.py` - Multi-layer padding with entropy balancing.
+  Applies multiple layers with different patterns, balances entropy (mix high/low),
+  creates complex byte distribution patterns.
 
 > Place your `to_be_evaded_ds.zip` archive under `attacker/` (or pass
 > `--archive` to any script) before invoking a method.

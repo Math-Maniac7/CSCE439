@@ -17,16 +17,13 @@ echo "模型配置: $MODELS_CONFIG"
 
 mkdir -p "$OUTPUT_DIR"
 
-# 定义所有攻击方法
+# 定义所有攻击方法（使用新的5种方法）
 METHODS=(
-    "method1_dropper"
-    "method2_hybrid_overlay"
-    "method3_safe_overlay"
-    "method4_agent"
-    "method5_llm_agent"
-    "method6_feature_obfuscation"
-    "method7_entropy_adjustment"
-    "method8_hybrid_advanced"
+    "methodA_dropper_metadata_overlay"
+    "methodB_section_rename_overlay"
+    "methodC_import_obfuscation"
+    "methodD_resource_manipulation"
+    "methodE_multilayer_padding"
 )
 
 # 运行每个攻击方法
@@ -78,9 +75,11 @@ from collections import defaultdict
 
 output_dir = Path("attack_results")
 methods = [
-    "method1_dropper", "method2_hybrid_overlay", "method3_safe_overlay",
-    "method4_agent", "method5_llm_agent", "method6_feature_obfuscation",
-    "method7_entropy_adjustment", "method8_hybrid_advanced"
+    "methodA_dropper_metadata_overlay",
+    "methodB_section_rename_overlay",
+    "methodC_import_obfuscation",
+    "methodD_resource_manipulation",
+    "methodE_multilayer_padding"
 ]
 
 summary = []
