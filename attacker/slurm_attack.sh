@@ -111,29 +111,65 @@ echo ""
 echo "Working directory: $(pwd)"
 echo ""
 
-# ==================== 检查输入文件 =====================
-echo "Checking input file..."
-INPUT_ARCHIVE="${1:-to_be_evaded_ds.zip}"
+# ==================== 检查输入文件或目录 =====================
+echo "Checking input file or directory..."
+INPUT_PATH="${1:-/scratch/user/yafeili/704/dataset/to_be_evaded_ds}"
 
 # 尝试多个可能的位置
-if [ -f "$INPUT_ARCHIVE" ]; then
-    echo "✓ 找到输入文件: $INPUT_ARCHIVE"
-elif [ -f "attacker/$INPUT_ARCHIVE" ]; then
-    INPUT_ARCHIVE="attacker/$INPUT_ARCHIVE"
-    echo "✓ 找到输入文件: $INPUT_ARCHIVE"
-elif [ -f "/scratch/user/yafeili/704/dataset/$INPUT_ARCHIVE" ]; then
-    INPUT_ARCHIVE="/scratch/user/yafeili/704/dataset/$INPUT_ARCHIVE"
-    echo "✓ 找到输入文件: $INPUT_ARCHIVE"
+FOUND_INPUT=""
+if [ -f "$INPUT_PATH" ]; then
+    FOUND_INPUT="$INPUT_PATH"
+    echo "✓ 找到输入文件: $FOUND_INPUT"
+elif [ -d "$INPUT_PATH" ]; then
+    FOUND_INPUT="$INPUT_PATH"
+    echo "✓ 找到输入目录: $FOUND_INPUT"
+elif [ -f "/scratch/user/yafeili/704/dataset/to_be_evaded_ds.zip" ]; then
+    FOUND_INPUT="/scratch/user/yafeili/704/dataset/to_be_evaded_ds.zip"
+    echo "✓ 找到输入文件: $FOUND_INPUT"
+elif [ -d "/scratch/user/yafeili/704/dataset/to_be_evaded_ds" ]; then
+    FOUND_INPUT="/scratch/user/yafeili/704/dataset/to_be_evaded_ds"
+    echo "✓ 找到输入目录: $FOUND_INPUT"
+elif [ -f "attacker/to_be_evaded_ds.zip" ]; then
+    FOUND_INPUT="attacker/to_be_evaded_ds.zip"
+    echo "✓ 找到输入文件: $FOUND_INPUT"
+elif [ -d "attacker/to_be_evaded_ds" ]; then
+    FOUND_INPUT="attacker/to_be_evaded_ds"
+    echo "✓ 找到输入目录: $FOUND_INPUT"
 else
-    echo "错误: 输入文件不存在: $INPUT_ARCHIVE"
-    echo "请将 to_be_evaded_ds.zip 放在以下位置之一:"
-    echo "  - $(pwd)/$INPUT_ARCHIVE"
-    echo "  - $(pwd)/attacker/$INPUT_ARCHIVE"
-    echo "  - /scratch/user/yafeili/704/dataset/$INPUT_ARCHIVE"
+    echo "错误: 输入文件或目录不存在"
+    echo "请将 to_be_evaded_ds 放在以下位置之一:"
+    echo "  - /scratch/user/yafeili/704/dataset/to_be_evaded_ds (目录，默认)"
+    echo "  - /scratch/user/yafeili/704/dataset/to_be_evaded_ds.zip (zip文件)"
+    echo "  - $(pwd)/attacker/to_be_evaded_ds"
     echo ""
     echo "或者使用参数指定:"
-    echo "  sbatch attacker/slurm_attack.sh /path/to/to_be_evaded_ds.zip"
+    echo "  sbatch attacker/slurm_attack.sh /path/to/to_be_evaded_ds"
     exit 1
+fi
+
+# 如果是目录，需要压缩成zip
+if [ -d "$FOUND_INPUT" ]; then
+    echo ""
+    echo "输入是目录，正在压缩成zip文件..."
+    TEMP_ZIP="$TMPDIR/to_be_evaded_ds_$$.zip"
+    
+    # 压缩目录（排除sha256sums.txt，因为攻击方法会生成新的）
+    cd "$(dirname "$FOUND_INPUT")"
+    zip -q -r "$TEMP_ZIP" "$(basename "$FOUND_INPUT")" -x "*/sha256sums.txt"
+    
+    if [ -f "$TEMP_ZIP" ]; then
+        INPUT_ARCHIVE="$TEMP_ZIP"
+        echo "✓ 已压缩: $INPUT_ARCHIVE"
+        echo "  源目录: $FOUND_INPUT"
+        echo "  临时zip: $INPUT_ARCHIVE"
+    else
+        echo "错误: 压缩目录失败"
+        exit 1
+    fi
+    cd "$PROJECT_DIR"
+elif [ -f "$FOUND_INPUT" ]; then
+    INPUT_ARCHIVE="$FOUND_INPUT"
+    echo "✓ 使用zip文件: $INPUT_ARCHIVE"
 fi
 
 # 创建输出目录
@@ -202,6 +238,14 @@ if [ -d "attack_results_5methods" ]; then
     echo "复制结果到统一输出目录..."
     cp -r attack_results_5methods/* "$OUTPUT_BASE/" 2>/dev/null || true
     echo "✓ 结果已复制到: $OUTPUT_BASE/"
+fi
+
+# 清理临时zip文件（如果是从目录压缩的）
+if [ -n "$TEMP_ZIP" ] && [ -f "$TEMP_ZIP" ]; then
+    echo ""
+    echo "清理临时zip文件..."
+    rm -f "$TEMP_ZIP"
+    echo "✓ 已清理: $TEMP_ZIP"
 fi
 
 exit $ATTACK_EXIT_CODE
