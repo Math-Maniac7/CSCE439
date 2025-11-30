@@ -11,3 +11,9 @@ try:
     __all__.append('DummyModel')
 except ImportError as e:
     print(f"Warning: Could not import DummyModel: {e}")
+
+try:
+    from .model1_rf_deep import Model1_RandomForest_Deep
+    __all__.append('Model1_RandomForest_Deep')
+except ImportError as e:
+    print(f"Warning: Could not import Model1: {e}")

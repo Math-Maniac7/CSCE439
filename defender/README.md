@@ -41,6 +41,49 @@ Install Python requirements needed to test the solution:
 pip install -r requirements.txt
 ```
 
+### Using Model1 RandomForest Deep (Extra Defense Model)
+
+This branch includes Model1 RandomForest Deep, a trained Random Forest classifier for malware detection using EMBER features.
+
+**To use Model1:**
+
+1. **Download the trained model file:**
+   - Download `model1_best.pickle` from: https://drive.google.com/file/d/1GEsn_imO1m1c4on5UiJmP0S7Ku8PkqJu/view?usp=sharing
+   - Place the file in `defender/defender/models/model1_best.pickle`
+   
+   **Quick download via command line:**
+   ```bash
+   pip install gdown
+   gdown https://drive.google.com/uc?id=1GEsn_imO1m1c4on5UiJmP0S7Ku8PkqJu -O defender/defender/models/model1_best.pickle
+   ```
+   
+   **Note:** The model file is not included in this repository due to size constraints. Please download it separately before running the defender.
+
+2. **Set environment variables (optional):**
+   ```bash
+   export DF_MODEL_NAME=model1
+   export DF_MODEL1_PATH=defender/models/model1_best.pickle
+   export DF_MODEL_THRESH=0.5
+   ```
+
+3. **Run the defender:**
+   ```bash
+   cd defender
+   python -m defender
+   ```
+
+   Or specify the model explicitly:
+   ```bash
+   DF_MODEL_NAME=model1 python -m defender
+   ```
+
+4. **Model Information:**
+   - **Algorithm**: Random Forest Classifier
+   - **Parameters**: 1500 estimators, max depth 35
+   - **Features**: EMBER v2 (2381 dimensions)
+   - **Performance**: 93.20% accuracy, 98.16% precision, 89.20% recall, 99.06% AUC-ROC
+   - **Training**: Trained on 1,360,000 samples from EMBER 2017, 2018 datasets
+
 From the `defender` folder that contains the `Dockerfile`, build the solution:
 ```
 docker build -t ember .

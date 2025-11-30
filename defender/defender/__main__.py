@@ -32,11 +32,18 @@ try:
 except ImportError:
     HAS_BEHEMOT_MODEL = False
 
+try:
+    from defender.models.model1_rf_deep import Model1_RandomForest_Deep
+    HAS_MODEL1 = True
+except ImportError as e:
+    print(f"Warning: Could not import Model1: {e}")
+    HAS_MODEL1 = False
+
 if __name__ == "__main__":
     # Retrieve config values from environment variables
     model_gz_path = envparse.env("DF_MODEL_GZ_PATH", cast=str, default="models/ember_model.txt.gz")
     model_thresh = envparse.env("DF_MODEL_THRESH", cast=float, default=0.8336)
-    model_name = envparse.env("DF_MODEL_NAME", cast=str, default="nfs")
+    model_name = envparse.env("DF_MODEL_NAME", cast=str, default="model1")
     model_ball_thresh = envparse.env("DF_MODEL_BALL_THRESH", cast=float, default=0.25)
     model_max_history = envparse.env("DF_MODEL_HISTORY", cast=int, default=10_000)
     
@@ -81,6 +88,21 @@ if __name__ == "__main__":
             print(f"Error loading EmberModel: {e}")
             import traceback
             traceback.print_exc()
+    
+    elif model_name.lower() == "model1" or model_name.lower() == "rf_deep":
+        if HAS_MODEL1:
+            try:
+                # Get model path from environment or use default
+                model1_path = envparse.env("DF_MODEL1_PATH", cast=str, default="defender/models/model1_best.pickle")
+                print(f"Loading Model1 RandomForest Deep from {model1_path}")
+                model = Model1_RandomForest_Deep(model_path=model1_path, thresh=model_thresh)
+                print("Model1 RandomForest Deep loaded successfully")
+            except Exception as e:
+                print(f"Error loading Model1: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("Model1 not available (import failed)")
     
     # Fallback to dummy model if main model fails
     if model is None:
