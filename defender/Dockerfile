@@ -22,7 +22,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy requirements and install
 COPY docker-requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir -r docker-requirements.txt
+ && pip install --no-cache-dir -r docker-requirements.txt \
+ && pip install --no-cache-dir gdown
 
 #############################
 # COPY APPLICATION CODE
@@ -40,6 +41,11 @@ COPY create_dummy_models.py /opt/defender/
 
 WORKDIR /opt/defender
 
+# Download Model1 trained model file
+RUN mkdir -p /opt/defender/defender/models \
+ && gdown https://drive.google.com/uc?id=1GEsn_imO1m1c4on5UiJmP0S7Ku8PkqJu -O /opt/defender/defender/models/model1_best.pickle \
+ || echo "Warning: Model download failed, will use dummy model if available"
+
 # Create dummy models if real ones don't exist
 RUN python create_dummy_models.py
 
@@ -55,8 +61,8 @@ USER defender
 # Set environment variables
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONPATH="/opt/defender"
-ENV DF_MODEL_NAME="ember"
-ENV DF_MODEL_THRESH=0.1
+ENV DF_MODEL_NAME="model1"
+ENV DF_MODEL_THRESH=0.5
 
 # Expose port
 EXPOSE 8080

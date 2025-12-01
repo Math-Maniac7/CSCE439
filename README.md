@@ -13,7 +13,7 @@ apt update
 
 apt install -y docker.io curl
 
-git clone -b SubmissionFinal https://github.com/Math-Maniac7/CSCE439.git
+git clone -b extra_defence https://github.com/Math-Maniac7/CSCE439.git
 
 cd CSCE439
 
@@ -29,8 +29,12 @@ curl -X GET http://localhost:8080/model
 
 *Testing files:*
 
-
 curl -X POST --data-binary @10_modified.exe http://localhost:8080/ -H "Content-Type: application/octet-stream"
 
-ember_model.txt.gz is the defense model, runs using ember_model.py
-attack files delivered separately 
+**Model Information:**
+- Model1 RandomForest Deep is the defense model, runs using model1_rf_deep.py
+- Model file (model1_best.pickle) is downloaded automatically during Docker build
+- Download link: https://drive.google.com/file/d/1GEsn_imO1m1c4on5UiJmP0S7Ku8PkqJu/view?usp=sharing
+- Performance: 93.20% accuracy, 99.06% AUC-ROC
+
+Attack files delivered separately 
